@@ -1,0 +1,6 @@
+# Replace paths for your machine before training.
+train: C:/path/to/permitted-dataset/images/train
+val: C:/path/to/permitted-dataset/images/val
+nc: 1
+names:
+  0: head

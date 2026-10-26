@@ -1,0 +1,13 @@
+# Direct dependencies used for Windows validation on Python 3.12.
+# Runtime dependencies resolve for your platform; see requirements.txt for supported ranges.
+streamlit==1.59.1
+ultralytics==8.4.90
+torch==2.13.0
+torchvision==0.28.0
+opencv-python-headless==5.0.0.93
+numpy==2.5.1
+pandas==3.0.3
+matplotlib>=3.8,<4
+reportlab==5.0.0
+pyyaml>=6,<7
+imageio-ffmpeg==0.6.0
