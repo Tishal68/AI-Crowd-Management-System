@@ -31,6 +31,16 @@ class PipelineTests(unittest.TestCase):
         writer.release()
     def tearDown(self):
         self.temp.cleanup()
+    def test_output_width_does_not_change_detection_input(self):
+        shapes = []
+        def detect(model, frame, **kwargs):
+            shapes.append(frame.shape[:2])
+            return []
+        with patch('src.core.video_processor.detect_heads_in_frame', side_effect=detect):
+            process_video('unused', str(self.source), preloaded_model=DummyModel(), max_width=160)
+        self.assertTrue(shapes)
+        self.assertEqual(set(shapes), {(240, 320)})
+
     def test_sampling_keeps_source_time_and_compresses(self):
         output=self.root/'annotated.mp4'
         with patch('src.core.video_processor.detect_heads_in_frame',return_value=[Detection(10,10,25,25,.9)]):

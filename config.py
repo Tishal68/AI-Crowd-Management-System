@@ -56,4 +56,4 @@ CSV_EXPORT_DIR = os.path.join(OUTPUTS_ROOT,'csv')
 HEATMAP_DIR = os.path.join(OUTPUTS_ROOT,'heatmaps')
 MAX_HISTORY_ENTRIES = 200
 PROJECT_DISPLAY_NAME = 'CrowdVision — Crowd Counting and Analytics'
-PROJECT_VERSION = '3.1.0'
+PROJECT_VERSION = '3.2.0'

@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import time
 import uuid
+from datetime import datetime, timezone
 import cv2
 import pandas as pd
 import streamlit as st
@@ -40,6 +41,8 @@ ROOT = Path(config.PROJECT_ROOT)
 SESSIONS = Path(config.OUTPUTS_ROOT) / 'sessions'
 if 'session_id' not in st.session_state:
     st.session_state.session_id = uuid.uuid4().hex
+if 'upload_generation' not in st.session_state:
+    st.session_state.upload_generation = 0
 session_dir = SESSIONS / st.session_state.session_id
 
 
@@ -48,11 +51,16 @@ def mb(size):
 
 
 with st.sidebar:
-    st.markdown('### Analysis settings')
-    weights = st.text_input('Model checkpoint', value=config.BEST_WEIGHTS_PATH,
-                           help='Use the supplied single-class head model. Other checkpoints must contain head/person classes.')
-    conf = st.slider('Minimum confidence', 0.05, 0.95, 0.35, 0.05)
-    imgsz = st.select_slider('Model input size', options=[320, 416, 512, 640, 768], value=640)
+    st.markdown('## ◉ CrowdVision')
+    st.caption('ADVANCED VIDEO ANALYTICS')
+    st.divider()
+    st.markdown('### Detection controls')
+    with st.expander('Model & detection tuning'):
+        weights = st.text_input('Model checkpoint', value=config.BEST_WEIGHTS_PATH,
+                               help='Trusted local head/person detection checkpoint.')
+        conf = st.slider('Minimum confidence', 0.05, 0.95, 0.35, 0.05)
+        imgsz = st.select_slider('Model input size', options=[320, 416, 512, 640, 768], value=640)
+    st.caption('Head detection · local CPU processing')
     mode_label = st.selectbox('Crowd classification', ['Occupancy against capacity', 'Image coverage (experimental)'])
     classification_mode = 'manual' if mode_label.startswith('Occupancy') else 'auto'
     capacity = st.number_input('Configured space capacity', min_value=1, max_value=100000, value=80,
@@ -68,6 +76,9 @@ with st.sidebar:
         clear_session(SESSIONS, st.session_state.session_id)
         st.session_state.pop('result', None)
         st.session_state.pop('upload_hash', None)
+        st.session_state.pop('pdf_for', None)
+        st.session_state.pop('last_error', None)
+        st.session_state.upload_generation += 1
         st.session_state.session_id = uuid.uuid4().hex
         st.rerun()
     with st.expander('Existing files on this computer'):
@@ -81,20 +92,29 @@ with st.sidebar:
             st.rerun()
 
 st.markdown('<div class="eyebrow">CROWDVISION / LOCAL ANALYTICS</div>', unsafe_allow_html=True)
-st.title('Understand the crowd. Keep the detail.')
-st.markdown('<div class="hero-copy">Count visible heads in images and recorded video. Review occupancy, inspect changes over time, and export a compact annotated result.</div>', unsafe_allow_html=True)
+st.title('Crowd analysis workspace')
+st.markdown('<div class="hero-copy">Inspect recorded footage, measure visible occupancy and review the moments that need attention.</div>', unsafe_allow_html=True)
 if classification_mode == 'auto':
     st.info('Image coverage is an experimental visual heuristic. Zoom and perspective affect it; it does not measure people per square metre or predict safety.')
 
 uploaded = st.file_uploader('Choose an image or video', type=config.ALLOWED_IMAGE_TYPES + config.ALLOWED_VIDEO_TYPES,
+                             key=f'media_{st.session_state.upload_generation}',
                              help='Up to 200 MB. Processing stays on this computer.')
 if uploaded is None:
-    st.markdown('### One recording, a complete review')
+    with st.container(border=True):
+        st.subheader('Your footage is the starting point')
+        st.write('Add a camera recording or image above to inspect it before analysis.')
+        a,b,c = st.columns(3)
+        a.metric('Source', 'Not selected')
+        b.metric('Analysis rate', f'{analysis_fps} FPS')
+        c.metric('Space capacity', f'{capacity} people')
+        st.caption('No counts are displayed until an analysis completes successfully.')
+    st.markdown('### Review workflow')
     a,b,c = st.columns(3)
-    a.markdown('**01 / Add media**\n\nUpload an image or recorded clip, then choose the capacity and processing detail.')
-    b.markdown('**02 / Inspect counts**\n\nReview sampled detections, peak occupancy and the source-video timeline.')
-    c.markdown('**03 / Export compactly**\n\nDownload H.264 video, frame data and a report. Repeated runs reuse identical results.')
-    st.caption('A local prototype for video analytics. Counts require validation for your camera and scene. Live RTSP and unique-person counting are not enabled.')
+    a.markdown('**01 · Inspect the source**\n\nCheck the camera view and set the capacity for the visible area.')
+    b.markdown('**02 · Review detections**\n\nCompare the original and annotated footage, then inspect sampled peaks.')
+    c.markdown('**03 · Save the evidence**\n\nExport compressed video, timestamped counts and a PDF report.')
+    st.info('Recorded-media prototype · Counts are visible detections, not unique visitors. Live cameras and calibrated density measurements are not available.')
     st.stop()
 
 raw = uploaded.getbuffer()
@@ -123,12 +143,37 @@ elif not source.exists():
     source.write_bytes(raw)
 del raw
 
-left, right = st.columns([1.4, 1])
-with left:
-    st.subheader(Path(uploaded.name).name)
-    st.caption(f'{mb(uploaded.size)} · {"Recorded video" if is_video else "Image"} · Output limited to {max_width}px wide for video')
-with right:
-    analyze = st.button('Analyze video' if is_video else 'Analyze image', type='primary', use_container_width=True)
+with st.container(border=True):
+    left, right = st.columns([1.8, 1])
+    with left:
+        st.subheader('01 · Source inspection')
+        st.write(Path(uploaded.name).name)
+        if is_video:
+            st.video(str(source))
+            st.caption('If your browser cannot play this source codec, inspect its first frame below. Analysis uses the local decoder.')
+            with st.expander('Source still frame'):
+                cap = cv2.VideoCapture(str(source))
+                try:
+                    readable, first_frame = cap.read()
+                finally:
+                    cap.release()
+                if readable:
+                    st.image(cv2.cvtColor(first_frame, cv2.COLOR_BGR2RGB), use_container_width=True)
+                else:
+                    st.warning('The source decoder could not read a first frame. Re-export as H.264 MP4.')
+        else:
+            st.image(str(source), use_container_width=True)
+    with right:
+        st.subheader('Analysis plan')
+        st.metric('Source file', mb(uploaded.size))
+        st.write(f'**Capacity:** {capacity:,} people')
+        st.write(f'**Classification:** {mode_label}')
+        if is_video:
+            st.write(f'**Sampling:** up to {analysis_fps} frames / second')
+            st.write(f'**Export:** H.264 · up to {max_width}px wide')
+        st.caption('Output resolution affects the saved preview only. Detection uses the source frame and the model input size.')
+        analyze = st.button('Run video analysis' if is_video else 'Run image analysis', type='primary', use_container_width=True)
+        st.caption('Results are sampled observations. Short events between samples may be missed.')
 
 current = st.session_state.get('result')
 if current and current.get('signature') != signature:
@@ -141,13 +186,13 @@ if analyze:
     st.session_state.pop('last_error', None)
     try:
         if cached.exists():
+            saved = json.loads(cached.read_text(encoding='utf-8'))
+            if not Path(saved.get('annotated_path', '')).is_file():
+                cached.unlink()
+        if cached.exists():
             record = json.loads(cached.read_text(encoding='utf-8'))
-            if not Path(record['annotated_path']).exists():
-                raise RuntimeError('The cached output was removed. Clear this session and analyze again.')
         else:
             # Identical reruns use the cache; old run artifacts are pruned after success.
-            if current and current.get('signature') != signature:
-                st.session_state.pop('result', None)
             model = get_model(weights)
             model_classes = ', '.join(model.names.values())
             model_name = str(model.model.yaml.get('yaml_file', 'YOLO'))
@@ -186,7 +231,7 @@ if analyze:
                 record = dict(data, signature=signature, id=signature, file_name=Path(uploaded.name).name,
                               media_type='video' if is_video else 'image', annotated_path=str(output),
                               settings=settings, model_name=model_name, model_classes=model_classes,
-                              crowd_level=data['peak_crowd_level'])
+                              crowd_level=data['peak_crowd_level'], created_at=datetime.now(timezone.utc).isoformat())
                 atomic_json(cached, record)
             progress.empty()
             preview.empty()
@@ -194,32 +239,42 @@ if analyze:
         st.session_state.result = record
         st.rerun()
     except Exception as exc:
-        st.session_state.pop('result', None)
-        st.error(str(exc))
-        st.caption('Analysis failed. No crowd count or occupancy status is reported for this run.')
+        st.session_state.last_error = str(exc)
+
+if st.session_state.get('last_error'):
+    st.error('Latest analysis failed: ' + st.session_state.last_error)
+    st.caption('Any result below belongs to the last successful run, not the failed attempt.')
 
 record = st.session_state.get('result')
+if record and not Path(record['annotated_path']).is_file():
+    st.warning('The saved result file is missing. Run analysis again to rebuild it.')
+    record = None
 if record:
     st.divider()
-    st.subheader('Analysis results')
+    st.subheader('02 · Detection review')
+    st.caption('Results for ' + record['file_name'] + ' · ' + record.get('created_at', 'Earlier session'))
     for warning in record.get('warnings', []):
         st.warning(warning)
     a,b,c,d = st.columns(4)
-    a.metric('Peak visible count', record['max_head_count'])
+    a.metric('Peak sampled count', record['max_head_count'])
     b.metric('Average visible count', f"{record['avg_head_count']:.1f}")
     c.metric('Peak crowd level', record['peak_crowd_level'].replace(' Crowd',''))
     d.metric('Annotated file', mb(record['output_bytes']))
-    preview_tab, analytics_tab, export_tab = st.tabs(['Annotated preview', 'Timeline & details', 'Downloads'])
-    with preview_tab:
+    view = st.radio('Review panel', ['Annotated footage', 'Occupancy timeline', 'Export results'], horizontal=True, label_visibility='collapsed')
+    if view == 'Annotated footage':
         if record['media_type'] == 'video':
             st.video(record['annotated_path'])
             st.caption(f"{record['output_width']} × {record['output_height']} · {record['sample_fps']:.2f} sampled FPS · H.264 · audio omitted")
         else:
             st.image(record['annotated_path'], use_container_width=True)
-    with analytics_tab:
+    elif view == 'Occupancy timeline':
         if record['media_type'] == 'video':
             chart = pd.DataFrame({'Source time (s)': record['timestamps'], 'Visible count': record['per_frame_counts']})
-            st.line_chart(chart.set_index('Source time (s)'))
+            if record['settings']['classification_mode'] == 'manual':
+                chart['Configured capacity'] = record['settings']['max_capacity']
+            st.line_chart(chart.set_index('Source time (s)'), color=['#b7e27c', '#f2ab69'] if 'Configured capacity' in chart else ['#b7e27c'])
+            peak_index = record['per_frame_counts'].index(record['max_head_count'])
+            st.write(f"First sampled peak: **{record['timestamps'][peak_index]:.2f}s** · Last sampled count: **{record['final_head_count']}**")
             st.caption(f"{record['processed_frames']:,} sampled frames · {record['source_duration']:.2f}s of source video · {record['fps_processed']:.2f} samples processed / wall-clock second")
         st.write('Final crowd level: ' + record['final_crowd_level'])
         st.write('Actual model: ' + record['model_name'] + ' · classes: ' + record['model_classes'])
@@ -228,10 +283,12 @@ if record:
         with st.expander('Settings used for this result'):
             st.json({k:v for k,v in record['settings'].items() if k not in ('weights_path','weights_mtime_ns')})
         st.caption('Peak and final status are different summaries. Counts are sampled detections, not unique people. Occupancy levels are configured rules, not validated safety predictions.')
-    with export_tab:
+    elif view == 'Export results':
+        st.subheader('03 · Export evidence')
+        st.caption('Download only the artifacts you need. Video exports omit audio.')
         path = Path(record['annotated_path'])
         st.download_button('Download annotated video' if record['media_type'] == 'video' else 'Download annotated image',
-                           data=path.read_bytes(), file_name='crowdvision' + path.suffix,
+                           data=path.read_bytes(), file_name=Path(record['file_name']).stem + '-annotated' + path.suffix,
                            mime='video/mp4' if record['media_type'] == 'video' else 'image/jpeg', use_container_width=True)
         st.download_button('Download frame data (CSV)', csv_bytes(record), file_name='crowdvision-counts.csv', mime='text/csv', use_container_width=True)
         if st.button('Prepare PDF report', use_container_width=True):

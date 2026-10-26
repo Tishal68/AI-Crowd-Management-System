@@ -100,7 +100,6 @@ def process_video(
             ret, frame = cap.retrieve()
             if not ret or frame is None:
                 raise IOError(f'Cannot decode video frame {index + 1}.')
-            frame = cv2.resize(frame, (out_w, out_h), interpolation=cv2.INTER_AREA)
             try:
                 detections = detect_heads_in_frame(
                     model, frame, conf=conf_threshold, iou=iou_threshold,
@@ -116,6 +115,7 @@ def process_video(
             levels.append(auto)
             timestamps.append(index / fps)
             annotated = draw_overlay(draw_detections(frame.copy(), detections), count, level)
+            annotated = cv2.resize(annotated, (out_w, out_h), interpolation=cv2.INTER_AREA)
             if writer:
                 writer.write(annotated)
             if frame_callback:
