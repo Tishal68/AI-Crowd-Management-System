@@ -9,6 +9,7 @@ Python 3.12 is recommended.
 ```powershell
 cd AI-Crowd-Management-System
 py -3.12 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 .\.venv\Scripts\python.exe -m streamlit run app.py
 ```

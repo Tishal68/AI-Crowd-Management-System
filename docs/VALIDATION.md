@@ -7,6 +7,8 @@
 - Streamlit AppTest startup and switching classification settings completed without exceptions.
 - Actual packaged head checkpoint loaded as YOLO11m with one `head` class. The packaging process removes absolute training paths/optimizer metadata; the learned tensor values were compared with the original supplied model.
 - Real-model inference on an existing local test recording produced sampled visible counts 16 and 19 at source timestamps 0.0s and 0.2s. The 4,689,181-byte test input produced a 199,664-byte annotated H.264 file at 960 × 540, 5 FPS. This is execution evidence only: no manual ground truth was supplied.
+- Browser CSV download completed and contained source times 0.0 and 0.2 seconds; the PDF preparation control generated an available PDF download.
+- Mobile welcome layout at 390px had no horizontal overflow; desktop layout was also visually inspected.
 - End-to-end browser video analysis completed. The browser decoded the output at 960 × 540 with readyState 4, a 0.4-second duration and no media error.
 
 ## Compression benchmark on an actual larger recording
