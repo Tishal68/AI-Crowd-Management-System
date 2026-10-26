@@ -13,7 +13,7 @@ import config
 from src.services.detection_service import get_model, run_image_detection, run_video_detection
 from src.services.report_generator import generate_pdf_report
 from src.services.exports import csv_bytes
-from src.services.storage import atomic_json, storage_bytes, clear_session, retain_run
+from src.services.storage import atomic_json, storage_bytes, clear_session, retain_run, LEGACY_FOLDERS, clear_legacy_exports
 from src.utils.helpers import get_crowd_level
 
 st.set_page_config(page_title='CrowdVision | Video analytics', page_icon='◉', layout='wide')
@@ -21,7 +21,7 @@ st.markdown('''<style>
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');
 html,body,[class*="css"]{font-family:'DM Sans',sans-serif}
 .stApp{background:#0c111b;color:#e8edf6}
-.block-container{max-width:1380px;padding-top:2rem;padding-bottom:3rem}
+.block-container{max-width:1380px;padding-top:3.5rem;padding-bottom:3rem}
 h1{font-size:2.4rem!important;letter-spacing:-.07rem;font-weight:700!important}
 h2,h3{letter-spacing:-.025rem}
 [data-testid="stMetric"]{background:#151e2d;border:1px solid #26344b;border-radius:12px;padding:18px}
@@ -33,7 +33,7 @@ h2,h3{letter-spacing:-.025rem}
 .eyebrow{color:#b7e27c;font-size:.75rem;letter-spacing:.15rem;font-weight:700;margin-bottom:8px}
 .hero-copy{color:#9eafc8;max-width:750px;line-height:1.6;margin-bottom:24px}
 .privacy{color:#889ab6;font-size:.8rem;padding-top:8px}
-@media(max-width:700px){.block-container{padding:1rem}h1{font-size:1.9rem!important}}
+@media(max-width:700px){.block-container{padding:3.5rem 1rem 1rem}h1{font-size:1.9rem!important}}
 </style>''', unsafe_allow_html=True)
 
 ROOT = Path(config.PROJECT_ROOT)
@@ -72,7 +72,13 @@ with st.sidebar:
         st.rerun()
     with st.expander('Existing files on this computer'):
         st.write('All generated output: ' + mb(storage_bytes(Path(config.OUTPUTS_ROOT))))
-        st.caption('Earlier videos and recordings are preserved. Use the included storage tool to preview their sizes and selectively remove old exports.')
+        st.caption('Earlier generated exports are preserved until you remove them. Download anything you need first; deletion is permanent.')
+        folders = st.multiselect('Old generated folders to clear', options=LEGACY_FOLDERS,
+                                 format_func=lambda name: name + ' · ' + mb(storage_bytes(Path(config.OUTPUTS_ROOT)/name)))
+        confirm_cleanup = st.checkbox('I have saved the selected exports and want to delete them')
+        if st.button('Delete selected old exports', disabled=not (folders and confirm_cleanup), use_container_width=True):
+            clear_legacy_exports(config.OUTPUTS_ROOT, folders)
+            st.rerun()
 
 st.markdown('<div class="eyebrow">CROWDVISION / LOCAL ANALYTICS</div>', unsafe_allow_html=True)
 st.title('Understand the crowd. Keep the detail.')

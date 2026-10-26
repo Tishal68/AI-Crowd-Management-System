@@ -2,7 +2,7 @@
 
 ## Automated and execution checks
 
-- 11 local regression tests passed on Windows/Python 3.12.6. These cover H.264 sampling/output duration, size-budget enforcement, inference failure and partial cleanup, CSV source timestamps, smoothing reorder, unsupported classes, occupancy boundaries, redaction, storage containment/pruning and PDF generation.
+- 12 local regression tests passed on Windows/Python 3.12.6. These cover H.264 sampling/output duration, size-budget enforcement, inference failure and partial cleanup, CSV source timestamps, smoothing reorder, unsupported classes, occupancy boundaries, redaction, storage containment/pruning and PDF generation.
 - Python source syntax checks passed. Installed dependency consistency check passed.
 - Streamlit AppTest startup and switching classification settings completed without exceptions.
 - Actual packaged head checkpoint loaded as YOLO11m with one `head` class. The packaging process removes absolute training paths/optimizer metadata; the learned tensor values were compared with the original supplied model.

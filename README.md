@@ -36,7 +36,7 @@ Source-video timestamps are independent of processing speed. Export playback use
 
 ## Storage and privacy
 
-New files live under `outputs/sessions/<random-session-id>/`. Original media outside this folder is never changed. Session IDs are per browser session; orphaned sessions after a browser/server restart remain on disk and may be removed after inspection. The app exposes the current session size and total generated storage. Historical camera URL credentials are redacted by the history/report services; recording history and all media are excluded from Git.
+New files live under `outputs/sessions/<random-session-id>/`. Original media outside this folder is never changed. Session IDs are per browser session; orphaned sessions after a browser/server restart remain on disk and may be removed after inspection. The app exposes the current session size and total generated storage. Expand “Existing files on this computer” in the sidebar to select and explicitly delete old generated exports after saving anything needed. Historical camera URL credentials are redacted by the history/report services; recording history and all media are excluded from Git.
 
 Preview earlier output sizes:
 

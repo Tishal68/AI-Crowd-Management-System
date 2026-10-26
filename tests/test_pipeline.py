@@ -11,7 +11,7 @@ from src.core.video_processor import process_video
 from src.core.encoding import ffmpeg_executable, CompactVideoWriter
 from src.utils.helpers import Detection, BoxSmoother, resolve_class_ids, get_crowd_level
 from src.utils.privacy import redact_sensitive
-from src.services.storage import atomic_json, clear_session, retain_run
+from src.services.storage import atomic_json, clear_session, retain_run, clear_legacy_exports
 from src.services.report_generator import generate_pdf_report
 from src.services.exports import csv_bytes
 
@@ -108,6 +108,15 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(get_crowd_level(61,100),'Moderate Crowd')
         self.assertEqual(get_crowd_level(85,100),'Moderate Crowd')
         self.assertEqual(get_crowd_level(86,100),'High Crowd')
+
+    def test_legacy_cleanup_is_explicit_and_contained(self):
+        folder=self.root/'streamlit_videos'; folder.mkdir()
+        (folder/'old.mp4').write_bytes(b'test')
+        outside=self.root/'original.mp4'; outside.write_bytes(b'keep')
+        with self.assertRaises(ValueError):
+            clear_legacy_exports(self.root,['../escape'])
+        self.assertEqual(clear_legacy_exports(self.root,['streamlit_videos']),4)
+        self.assertTrue(outside.exists())
 
 if __name__=='__main__':
     unittest.main()

@@ -41,3 +41,24 @@ def retain_run(session_dir, signature):
         if path.is_dir() and not path.is_symlink() and re.fullmatch(r"[0-9a-f]{24}", path.name) and path.name != signature:
             if path.resolve().parent == root:
                 shutil.rmtree(path)
+
+
+LEGACY_FOLDERS = ('streamlit_videos', 'streamlit_images', 'rtsp_recordings', '_uploads', 'csv', 'reports')
+
+def clear_legacy_exports(outputs_root, folders):
+    """Delete only explicitly selected direct legacy exports, never source media elsewhere."""
+    root = Path(outputs_root).resolve()
+    if any(folder not in LEGACY_FOLDERS for folder in folders):
+        raise ValueError('Select a supported generated-output folder.')
+    removed = 0
+    for folder in folders:
+        original = root / folder
+        target = original.resolve()
+        if original.is_symlink() or target.parent != root:
+            raise ValueError('Unsafe cleanup path; nothing deleted in this folder.')
+        if target.exists():
+            for path in target.iterdir():
+                if path.is_file() and not path.is_symlink():
+                    removed += path.stat().st_size
+                    path.unlink()
+    return removed
