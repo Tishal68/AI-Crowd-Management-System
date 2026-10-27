@@ -21,11 +21,56 @@ def atomic_json(path, value):
 
 def storage_bytes(path):
     root = Path(path)
-    return sum(p.stat().st_size for p in root.rglob('*') if p.is_file()) if root.exists() else 0
+    size = 0
+    if root.exists():
+        for p in root.rglob('*'):
+            try:
+                if p.is_file() and not p.is_symlink(): size += p.stat().st_size
+            except FileNotFoundError:
+                pass
+    return size
+
+
+def session_inventory(root):
+    """Only app-owned UUID session folders; never traverse linked directories."""
+    import re
+    root=Path(root)
+    if not root.exists(): return []
+    sessions=[]
+    for directory in root.iterdir():
+        if directory.is_dir() and not directory.is_symlink() and re.fullmatch(r'[a-f0-9]{32}',directory.name):
+            runs=[]
+            for record in directory.glob('*/result.json'):
+                if record.parent.is_symlink(): continue
+                try:
+                    data=json.loads(record.read_text(encoding='utf-8'))
+                    output=Path(data['annotated_path']).resolve()
+                    if output.parent==record.parent.resolve() and output.is_file():
+                        runs.append(data)
+                except (OSError,ValueError,KeyError): pass
+            sessions.append(dict(id=directory.name,bytes=storage_bytes(directory),runs=runs,modified=directory.stat().st_mtime))
+    return sorted(sessions,key=lambda x:x['modified'],reverse=True)
+
+
+def check_storage_budget(root, additional_bytes, limit=2*1024**3):
+    """Fail before writing; callers serialize writes/jobs with the local workspace lock."""
+    reserved=0
+    for path in (Path(root)/'sessions').glob('*/*/status.json'):
+        try:
+            state=json.loads(path.read_text(encoding='utf-8')).get('state')
+            if state in ('queued','running','cancelling'):
+                reserved+=max(0,150*1024**2-storage_bytes(path.parent))
+        except (OSError,ValueError): pass
+    if storage_bytes(root)+reserved+additional_bytes > limit:
+        raise ValueError('The 2 GB workspace limit would be exceeded. Remove saved sessions in Storage before continuing.')
 
 
 def clear_session(root, session_id):
+    import re
     root = Path(root).resolve()
+    original=root/session_id
+    if not re.fullmatch(r'[a-f0-9]{32}',session_id) or original.is_symlink() or original.is_junction():
+        raise ValueError('Invalid session path.')
     target = (root / session_id).resolve()
     if target.parent != root or not session_id or target == root:
         raise ValueError('Invalid session path.')

@@ -72,7 +72,10 @@ RUN_NAME='scut_gpu_'+datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')
 command=[sys.executable,'-u','scripts/model_experiment.py','--dataset',str(dataset),
          '--name',RUN_NAME,'--epochs',str(EPOCHS),'--train-images','0','--val-images','0',
          '--test-images','0','--device','0','--batch',str(BATCH),'--freeze','0','--imgsz','768','--patience','8']
-subprocess.run(command,check=True)
+with subprocess.Popen(command,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,bufsize=1) as process:
+    for output_line in process.stdout:
+        print(output_line,end='',flush=True)
+    if process.wait(): raise RuntimeError('Training or evaluation failed. Inspect the output above.')
 ''')
 code('''import zipfile
 import pandas as pd

@@ -1,0 +1,36 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+*{box-sizing:border-box}body{margin:0;font:14px system-ui;color:#dbe5f3;background:#101824}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;padding:10px}button{border:1px solid #35455b;background:#192638;color:#dbe5f3;padding:8px 12px;border-radius:6px;cursor:pointer}button.active{background:#244257;border-color:#6dc6df}button:focus-visible{outline:2px solid #6dc6df}canvas{width:100%;display:block;touch-action:none;cursor:crosshair}p{margin:8px 12px;color:#9eb0c7;font-size:12px;line-height:1.5}.primary{background:#24596b}#message{color:#98d7e8}
+</style></head><body>
+<div class="toolbar"><button id="zone" class="active">Draw counting area</button><button id="flow">Draw flow line</button><button id="undo">Undo point</button><button id="reset">Full frame</button><button id="apply" class="primary">Apply area & line</button></div>
+<canvas id="scene" aria-label="Click image corners to define a counting area" role="img"></canvas>
+<p id="message">Full frame selected. Click 3–12 corners clockwise, then Apply. Use a convex shape without crossing edges.</p>
+<p>Flow line: choose two endpoints. Orange arrow shows the positive crossing direction. Flow estimates are experimental.</p>
+<script>
+const canvas=document.getElementById('scene'),ctx=canvas.getContext('2d');
+let img=new Image(),mode='zone',points=[],line=[],source='';
+function send(type,extra={}){parent.postMessage({isStreamlitMessage:true,type,...extra},'*')}
+function height(){send('streamlit:setFrameHeight',{height:document.body.scrollHeight+4})}
+function draw(){
+ if(!img.naturalWidth)return;
+ canvas.width=img.naturalWidth;canvas.height=img.naturalHeight;ctx.drawImage(img,0,0);
+ let zone=points.length?points:[[0,0],[1,0],[1,1],[0,1]];
+ ctx.strokeStyle='#6dc6df';ctx.fillStyle='#6dc6df22';ctx.lineWidth=3;
+ ctx.beginPath();zone.forEach((p,i)=>i?ctx.lineTo(p[0]*canvas.width,p[1]*canvas.height):ctx.moveTo(p[0]*canvas.width,p[1]*canvas.height));
+ if(zone.length>=3){ctx.closePath();ctx.fill()}ctx.stroke();
+ zone.forEach((p,i)=>{ctx.fillStyle='#6dc6df';ctx.beginPath();ctx.arc(p[0]*canvas.width,p[1]*canvas.height,5,0,Math.PI*2);ctx.fill();ctx.font='16px system-ui';ctx.fillText(i+1,p[0]*canvas.width+8,p[1]*canvas.height+18)});
+ ctx.strokeStyle='#ffb568';ctx.fillStyle='#ffb568';
+ if(line.length){ctx.beginPath();ctx.moveTo(line[0][0]*canvas.width,line[0][1]*canvas.height);if(line.length===2){ctx.lineTo(line[1][0]*canvas.width,line[1][1]*canvas.height)}ctx.stroke();
+ line.forEach((p,i)=>{ctx.beginPath();ctx.arc(p[0]*canvas.width,p[1]*canvas.height,5,0,Math.PI*2);ctx.fill();ctx.fillText(i?'B':'A',p[0]*canvas.width+8,p[1]*canvas.height+18)});
+ if(line.length===2){let [a,b]=line.map(p=>[p[0]*canvas.width,p[1]*canvas.height]),dx=b[0]-a[0],dy=b[1]-a[1],n=Math.hypot(dx,dy);if(n){let x=(a[0]+b[0])/2,y=(a[1]+b[1])/2,ex=x-dy/n*35,ey=y+dx/n*35;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(ex,ey);ctx.stroke();ctx.beginPath();ctx.arc(ex,ey,4,0,Math.PI*2);ctx.fill()}}}
+ height();
+}
+canvas.addEventListener('pointerdown',e=>{let r=canvas.getBoundingClientRect(),p=[Math.max(0,Math.min(1,(e.clientX-r.left)/r.width)),Math.max(0,Math.min(1,(e.clientY-r.top)/r.height))];if(mode==='zone'){if(points.length<12)points.push(p)}else{if(line.length===2)line=[];line.push(p)}document.getElementById('message').textContent='Unsaved changes — select Apply area & line to use this geometry.';draw()});
+function setMode(v){mode=v;document.getElementById('zone').classList.toggle('active',v==='zone');document.getElementById('flow').classList.toggle('active',v==='flow')}
+document.getElementById('zone').onclick=()=>setMode('zone');document.getElementById('flow').onclick=()=>setMode('flow');
+document.getElementById('undo').onclick=()=>{(mode==='zone'?points:line).pop();draw()};
+document.getElementById('reset').onclick=()=>{points=[];line=[];draw();document.getElementById('message').textContent='Full frame. Select Apply to save.'};
+document.getElementById('apply').onclick=()=>{if(points.length&&points.length<3){document.getElementById('message').textContent='Select at least three area corners.';return}if(line.length===1){document.getElementById('message').textContent='Select the second flow-line endpoint.';return}send('streamlit:setComponentValue',{value:{polygon:points.length?points:null,line:line.length?line:null}});document.getElementById('message').textContent='Geometry submitted. Check the workspace for validation.'};
+window.addEventListener('message',e=>{if(e.data.type==='streamlit:render'&&e.data.args.image!==source){source=e.data.args.image;points=e.data.args.geometry?.polygon||[];line=e.data.args.geometry?.line||[];document.getElementById('message').textContent=points.length?'Saved area restored. Edit and Apply to change it.':'Full frame selected. Click 3–12 corners, then Apply.';img.onload=draw;img.src=source}});
+new ResizeObserver(height).observe(document.body);send('streamlit:componentReady',{apiVersion:1});
+</script></body></html>

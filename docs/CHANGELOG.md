@@ -1,3 +1,12 @@
+# Changes in 4.0
+
+- Reframed the project around campus entrance and event-space occupancy review, with an interactive counting area, sustained capacity events, event navigation and experimental directional line crossings.
+- Added cancellable background analysis, saved-session recovery, cross-session admission locking and a 2 GB workspace budget with active-job reservations.
+- Used decoded timestamps for sampling and events; rejected missing/non-monotonic times and prevented events from bridging observation gaps.
+- Blocked corrupt repeated training labels, converted the official SCUT-HEAD Part B data and trained on a Colab Tesla T4. Published the negative model comparison; retained the stronger existing checkpoint.
+- Added Model lab, event CSV/PDF details, compact evidence thumbnails and area/flow settings recovery after background jobs.
+- Expanded regression coverage to 30 tests. Historical 3.1 notes below describe the earlier release; 4.0 retains separate saved runs until explicitly deleted.
+
 # Changes in 3.1
 
 - Compact H.264 export replaces unrestricted full-resolution MPEG-4. Sample rate, output width, source-aware bitrate and an explicit size budget control disk use.

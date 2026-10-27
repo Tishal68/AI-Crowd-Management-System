@@ -34,6 +34,13 @@ def generate_pdf_report(record, output_path=None, chart_image_path=None):
         ['Processing time', f"{record.get('processing_time_seconds',0):.2f} s"],
     ]
     settings = record.get('settings',{})
+    rows += [['Location',settings.get('location','Not recorded')],
+             ['Analysis completed (UTC)',record.get('created_at','Not recorded')],
+             ['Counting area',str(settings.get('roi_polygon','Full frame / historical run'))],
+             ['Sustained capacity events',len(record.get('events',[]))],
+             ['Event duration rule',str(settings.get('event_seconds','Not recorded'))+' seconds'],
+             ['Along-arrow crossings',record.get('forward_crossings',0) if settings.get('flow_line') else 'Disabled'],
+             ['Against-arrow crossings',record.get('reverse_crossings',0) if settings.get('flow_line') else 'Disabled']]
     rows += [['Classification', settings.get('classification_mode','Not recorded')],
              ['Configured capacity', settings.get('max_capacity','Not recorded')],
              ['Source frame rate', record.get('source_fps','Not recorded')],
@@ -43,6 +50,11 @@ def generate_pdf_report(record, output_path=None, chart_image_path=None):
                               ('VALIGN',(0,0),(-1,-1),'TOP'),('BOTTOMPADDING',(0,0),(-1,-1),9),
                               ('TOPPADDING',(0,0),(-1,-1),9),('LINEBELOW',(0,0),(-1,-1),.3,colors.lightgrey)]))
     story += [table, Spacer(1,.5*cm)]
+    if record.get('events'):
+        story.append(para('Sampled capacity exceedances','Heading2'))
+        for event in record['events'][:100]:
+            story.append(para(f"{event['start_seconds']:.2f}s to {event['end_seconds']:.2f}s: peak {event['peak_count']}, observed duration {event['duration_seconds']:.2f}s."))
+        if len(record['events'])>100: story.append(para('First 100 events shown; download the events CSV for the complete list.'))
     if chart_image_path and Path(chart_image_path).is_file():
         story.append(Image(chart_image_path,width=16*cm,height=7*cm))
     story += [para('Interpretation', 'Heading2'),

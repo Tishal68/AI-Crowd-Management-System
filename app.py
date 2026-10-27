@@ -1,303 +1,293 @@
-"""CrowdVision: compact local crowd analysis with immutable run settings."""
-from __future__ import annotations
-from dataclasses import asdict
+"""CrowdVision Campus: recorded-footage occupancy and flow review."""
+from pathlib import Path
 import hashlib
 import json
-from pathlib import Path
-import time
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 import cv2
 import pandas as pd
 import streamlit as st
+from filelock import FileLock
 import config
-from src.services.detection_service import get_model, run_image_detection, run_video_detection
-from src.services.report_generator import generate_pdf_report
+from src.core.scene import validate_polygon, validate_line
+from src.services.storage import storage_bytes, clear_session, session_inventory, check_storage_budget
+from src.services.jobs import start_job, read_status, cancel_job, ACTIVE_STATES
 from src.services.exports import csv_bytes
-from src.services.storage import atomic_json, storage_bytes, clear_session, retain_run, LEGACY_FOLDERS, clear_legacy_exports
-from src.utils.helpers import get_crowd_level
+from src.services.report_generator import generate_pdf_report
+from src.ui.scene_editor import scene_editor
 
-st.set_page_config(page_title='CrowdVision | Video analytics', page_icon='◉', layout='wide')
+st.set_page_config(page_title='CrowdVision Campus',page_icon='◈',layout='wide')
 st.markdown('''<style>
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');
-html,body,[class*="css"]{font-family:'DM Sans',sans-serif}
-.stApp{background:#0c111b;color:#e8edf6}
-.block-container{max-width:1380px;padding-top:3.5rem;padding-bottom:3rem}
-h1{font-size:2.4rem!important;letter-spacing:-.07rem;font-weight:700!important}
-h2,h3{letter-spacing:-.025rem}
-[data-testid="stMetric"]{background:#151e2d;border:1px solid #26344b;border-radius:12px;padding:18px}
-[data-testid="stMetricLabel"]{color:#abb8cc}
-[data-testid="stMetricValue"]{font-size:1.8rem}
-[data-testid="stFileUploader"]{border:1px dashed #40516e;border-radius:12px;padding:12px;background:#111a28}
-[data-testid="stSidebar"]{background:#111926}
-.stButton>button[kind="primary"]{background:#b7e27c;color:#15200d;border:0;font-weight:700}
-.eyebrow{color:#b7e27c;font-size:.75rem;letter-spacing:.15rem;font-weight:700;margin-bottom:8px}
-.hero-copy{color:#9eafc8;max-width:750px;line-height:1.6;margin-bottom:24px}
-.privacy{color:#889ab6;font-size:.8rem;padding-top:8px}
-@media(max-width:700px){.block-container{padding:3.5rem 1rem 1rem}h1{font-size:1.9rem!important}}
-</style>''', unsafe_allow_html=True)
+.stApp{background:#0d1420;color:#e5ecf5}.block-container{max-width:1500px;padding:2.8rem 2rem 3rem}
+h1{font-size:1.85rem!important;letter-spacing:-.04rem}h2{font-size:1.4rem!important}h3{font-size:1.05rem!important}
+[data-testid="stSidebar"]{background:#111c2b;border-right:1px solid #243247}
+[data-testid="stMetric"]{background:#152234;border:1px solid #293b51;border-radius:8px;padding:14px}
+[data-testid="stMetricLabel"]{color:#a7b7ca}[data-testid="stMetricValue"]{font-size:1.65rem}
+[data-testid="stFileUploader"]{border:1px dashed #3e596e;border-radius:8px;padding:8px}
+.eyebrow{font:600 11px system-ui;letter-spacing:2px;color:#6dc6df;margin-bottom:6px}
+.purpose{color:#a8b9cd;line-height:1.6;font-size:14px;max-width:850px}
+.stButton>button[kind="primary"]{background:#6dc6df;color:#0b2028;border:0;font-weight:600}
+@media(max-width:700px){.block-container{padding:3rem 1rem 1rem}h1{font-size:1.5rem!important}}
+</style>''',unsafe_allow_html=True)
+ROOT=Path(config.PROJECT_ROOT); OUTPUTS=Path(config.OUTPUTS_ROOT); SESSIONS=OUTPUTS/'sessions'
+for key,value in [('session_id',uuid.uuid4().hex),('upload_generation',0)]:
+    if key not in st.session_state: st.session_state[key]=value
+session_dir=SESSIONS/st.session_state.session_id
 
-ROOT = Path(config.PROJECT_ROOT)
-SESSIONS = Path(config.OUTPUTS_ROOT) / 'sessions'
-if 'session_id' not in st.session_state:
-    st.session_state.session_id = uuid.uuid4().hex
-if 'upload_generation' not in st.session_state:
-    st.session_state.upload_generation = 0
-session_dir = SESSIONS / st.session_state.session_id
+def mb(n): return f'{n/1024**2:.1f} MB'
+
+def reset_session():
+    clear_session(SESSIONS,st.session_state.session_id)
+    for key in ('result','upload_hash','last_error','active_run','pdf_for'): st.session_state.pop(key,None)
+    st.session_state.session_id=uuid.uuid4().hex
+    st.session_state.upload_generation+=1
 
 
-def mb(size):
-    return f'{size / 1024**2:.2f} MB'
-
+def media_uploader(disabled=False):
+    return st.file_uploader('Add recorded footage or a still image',type=config.ALLOWED_IMAGE_TYPES+config.ALLOWED_VIDEO_TYPES,key=f'media_{st.session_state.upload_generation}',disabled=disabled,help='Up to 200 MB and 10 minutes. Your original file is not changed.')
 
 with st.sidebar:
-    st.markdown('## ◉ CrowdVision')
-    st.caption('ADVANCED VIDEO ANALYTICS')
+    st.markdown('## ◈ CrowdVision')
+    st.caption('CAMPUS OCCUPANCY & FLOW')
+    page=st.radio('Workspace',['Review footage','Saved sessions','Model lab'],label_visibility='collapsed')
     st.divider()
-    st.markdown('### Detection controls')
-    with st.expander('Model & detection tuning'):
-        weights = st.text_input('Model checkpoint', value=config.BEST_WEIGHTS_PATH,
-                               help='Trusted local head/person detection checkpoint.')
-        conf = st.slider('Minimum confidence', 0.05, 0.95, 0.35, 0.05)
-        imgsz = st.select_slider('Model input size', options=[320, 416, 512, 640, 768], value=640)
-    st.caption('Head detection · local CPU processing')
-    mode_label = st.selectbox('Crowd classification', ['Occupancy against capacity', 'Image coverage (experimental)'])
-    classification_mode = 'manual' if mode_label.startswith('Occupancy') else 'auto'
-    capacity = st.number_input('Configured space capacity', min_value=1, max_value=100000, value=80,
-                               help='Set this for your monitored area. Low: up to 60%; moderate: up to 85%; high: above 85%. These are configurable occupancy rules, not safety limits.')
-    analysis_fps = st.select_slider('Video samples per second', options=[1, 2, 5, 10, 15], value=5,
-                                     help='Lower values save processing time and output size. Events between samples can be missed.')
-    max_width = st.selectbox('Maximum output width', options=[640, 960, 1280], index=1)
-    st.caption('H.264 export · source-based bitrate · silent video. Preview is sampled at the selected rate.')
+    location=st.text_input('Monitored location',value='Campus entrance',max_chars=100)
+    capacity=st.number_input('Capacity of selected area',1,100000,80,help='Set capacity for the area you draw, not the whole venue.')
+    event_seconds=st.number_input('Flag when over capacity for (seconds)',1.,60.,3.,1.)
+    analysis_fps=st.select_slider('Analysis samples / second',[1,2,5,10,15],value=5)
+    with st.expander('Model & export settings'):
+        weights=st.text_input('Trusted local model',config.BEST_WEIGHTS_PATH)
+        conf=st.slider('Detection confidence',.05,.95,float(config.INFERENCE_CONF_THRESHOLD),.05)
+        imgsz=st.select_slider('Detection detail',[416,640,768,960],value=640)
+        max_width=st.selectbox('Export width',[640,960,1280],index=1)
+        st.caption('Higher detail can help small heads but costs processing time. Export width does not change detector input.')
     st.divider()
-    st.markdown('### Local storage')
-    st.caption('This session: ' + mb(storage_bytes(session_dir)))
-    if st.button('Clear this session', use_container_width=True):
-        clear_session(SESSIONS, st.session_state.session_id)
-        st.session_state.pop('result', None)
-        st.session_state.pop('upload_hash', None)
-        st.session_state.pop('pdf_for', None)
-        st.session_state.pop('last_error', None)
-        st.session_state.upload_generation += 1
-        st.session_state.session_id = uuid.uuid4().hex
-        st.rerun()
-    with st.expander('Existing files on this computer'):
-        st.write('All generated output: ' + mb(storage_bytes(Path(config.OUTPUTS_ROOT))))
-        st.caption('Earlier generated exports are preserved until you remove them. Download anything you need first; deletion is permanent.')
-        folders = st.multiselect('Old generated folders to clear', options=LEGACY_FOLDERS,
-                                 format_func=lambda name: name + ' · ' + mb(storage_bytes(Path(config.OUTPUTS_ROOT)/name)))
-        confirm_cleanup = st.checkbox('I have saved the selected exports and want to delete them')
-        if st.button('Delete selected old exports', disabled=not (folders and confirm_cleanup), use_container_width=True):
-            clear_legacy_exports(config.OUTPUTS_ROOT, folders)
-            st.rerun()
+    st.caption('Recorded footage · local CPU processing')
+    st.caption('10-minute clips · 2 GB workspace limit')
+    if st.button('Clear this session',disabled=bool(st.session_state.get('active_run')),width='stretch'):
+        reset_session(); st.rerun()
 
-st.markdown('<div class="eyebrow">CROWDVISION / LOCAL ANALYTICS</div>', unsafe_allow_html=True)
-st.title('Crowd analysis workspace')
-st.markdown('<div class="hero-copy">Inspect recorded footage, measure visible occupancy and review the moments that need attention.</div>', unsafe_allow_html=True)
-if classification_mode == 'auto':
-    st.info('Image coverage is an experimental visual heuristic. Zoom and perspective affect it; it does not measure people per square metre or predict safety.')
+st.markdown('<div class="eyebrow">CAMPUS OPERATIONS / RECORDED FOOTAGE</div>',unsafe_allow_html=True)
+st.title('Crowd occupancy & flow review')
+st.markdown('<div class="purpose">Locate sustained crowd buildup at entrances and event spaces. Define the monitored area, inspect capacity exceedances, and review movement across a chosen line.</div>',unsafe_allow_html=True)
 
-uploaded = st.file_uploader('Choose an image or video', type=config.ALLOWED_IMAGE_TYPES + config.ALLOWED_VIDEO_TYPES,
-                             key=f'media_{st.session_state.upload_generation}',
-                             help='Up to 200 MB. Processing stays on this computer.')
+
+def render_results(record):
+    path=Path(record['annotated_path'])
+    if not path.is_file():
+        st.warning('Saved output is missing. Upload the source and run analysis again.'); return
+    settings=record['settings']; events=record.get('events',[])
+    st.subheader(settings.get('location','Recorded area')+' · Analysis results')
+    created=record.get('created_at')
+    try: created=datetime.fromisoformat(created).astimezone().strftime('%d %b %Y, %I:%M %p') if created else 'Earlier analysis'
+    except ValueError: created='Earlier analysis'
+    st.caption(record['file_name']+' · '+created)
+    for warning in record.get('warnings',[]): st.warning(warning)
+    a,b,c,d=st.columns(4)
+    a.metric('Peak in selected area',record['max_head_count'])
+    b.metric('Peak / capacity',f"{record['max_head_count']/settings['max_capacity']*100:.0f}%")
+    c.metric('Sustained exceedances',len(events) if record['media_type']=='video' else '—')
+    d.metric('Analyzed duration',f"{record.get('source_duration',0):.1f}s" if record['media_type']=='video' else 'Image')
+    panel=st.radio('Results view',['Footage & events','Timeline & flow','Export'],horizontal=True,key='review_'+record['signature'])
+    if panel=='Footage & events':
+        footage,incidents=st.columns([2.2,1])
+        with incidents:
+            st.markdown('### Capacity events')
+            labels=['Start of recording']+[f"{e['start_seconds']:.1f}s–{e['end_seconds']:.1f}s · peak {e['peak_count']}" for e in events]
+            selected=st.selectbox('Jump to event',range(len(labels)),format_func=lambda i:labels[i],key='event_'+record['signature'])
+            seek=events[selected-1]['peak_seconds'] if selected else 0
+            if not events: st.caption('No sustained sampled exceedance met the configured duration. This is not a safety clearance.')
+            else:
+                event=events[selected-1] if selected else max(events,key=lambda e:e['peak_count'])
+                st.write(f"**Peak:** {event['peak_count']} / {settings['max_capacity']}")
+                st.write(f"**Observed duration:** {event['duration_seconds']:.1f}s")
+                if event.get('thumbnail') and Path(event['thumbnail']).is_file(): st.image(event['thumbnail'],width='stretch')
+                st.caption('Review this interval for queue buildup or an obstructed passage. Confirm detections before acting.')
+            st.caption(f"Rule: more than {settings['max_capacity']} heads for at least {settings.get('event_seconds',3):g}s of consecutive sampled observations.")
+        with footage:
+            if record['media_type']=='video': st.video(str(path),start_time=float(seek))
+            else: st.image(str(path),width='stretch')
+            st.caption('Cyan: counting area · orange: optional flow line · IDs: temporary tracking estimates')
+    elif panel=='Timeline & flow':
+        chart=pd.DataFrame({'Source time (s)':record['timestamps'],'Heads in area':record['per_frame_counts']})
+        chart['Capacity']=settings['max_capacity']
+        st.line_chart(chart.set_index('Source time (s)'),color=['#6dc6df','#ffb568'])
+        peak=record['per_frame_counts'].index(record['max_head_count'])
+        st.caption(f"First sampled peak: {record['timestamps'][peak]:.2f}s · Average sampled count: {record['avg_head_count']:.1f} · {record['processed_frames']} analyzed samples")
+        if settings.get('flow_line'):
+            a,b=st.columns(2)
+            a.metric('Along arrow',record.get('forward_crossings',0)); b.metric('Against arrow',record.get('reverse_crossings',0))
+            st.warning('Experimental flow estimates. Occlusion, low sampling rates and identity switches can miss or duplicate crossings. These are not unique visitors.')
+            if record.get('crossings'): st.dataframe(pd.DataFrame(record['crossings']),hide_index=True,width='stretch')
+        else: st.caption('Draw a line and enable flow before analysis to estimate directional crossings.')
+        if events: st.dataframe(pd.DataFrame([{k:v for k,v in e.items() if k!='thumbnail'} for e in events]),hide_index=True,width='stretch')
+    else:
+        st.caption(f"Source {mb(record['input_bytes'])} → annotated output {mb(record['output_bytes'])}. Video is sampled H.264 without audio.")
+        st.download_button('Annotated footage',path.read_bytes(),file_name=Path(record['file_name']).stem+'-annotated'+path.suffix,mime='video/mp4' if record['media_type']=='video' else 'image/jpeg',width='stretch')
+        st.download_button('Timestamped counts · CSV',csv_bytes(record),file_name='area-counts.csv',mime='text/csv',width='stretch')
+        event_csv=pd.DataFrame([{k:v for k,v in e.items() if k!='thumbnail'} for e in events],columns=['start_seconds','end_seconds','duration_seconds','peak_count','peak_seconds','capacity']).to_csv(index=False)
+        st.download_button('Capacity events · CSV',event_csv,file_name='capacity-events.csv',mime='text/csv',width='stretch')
+        if st.button('Prepare analysis report',key='pdf_'+record['signature']):
+            try: generate_pdf_report(record,str(path.parent/'report.pdf'))
+            except Exception as exc: st.error('Report failed: '+str(exc))
+        if (path.parent/'report.pdf').is_file(): st.download_button('Download PDF report',(path.parent/'report.pdf').read_bytes(),file_name='campus-occupancy-report.pdf',mime='application/pdf')
+    with st.expander('Run details & limitations'):
+        st.write('Detector: '+record['model_name']+' · '+record['model_classes'])
+        st.write(f"Processing time: {record['processing_time_seconds']:.1f}s")
+        st.json({k:v for k,v in settings.items() if k not in ('weights_path','weights_mtime_ns')})
+        st.caption('Counts represent detected head centres in the selected area. Missed heads, false detections and events between samples remain possible. Capacity is a user-defined operating threshold, not a validated safety limit.')
+
+
+@st.fragment(run_every=2)
+def job_progress(run_dir):
+    status=read_status(run_dir); state=status.get('state','queued')
+    if state=='complete':
+        st.session_state.result=json.loads((Path(run_dir)/'result.json').read_text(encoding='utf-8'))
+        st.session_state.pop('active_run',None); st.session_state.pop('last_error',None); st.rerun()
+    if state in ('failed','cancelled'):
+        st.session_state.last_error=status.get('error',state)
+        st.session_state.pop('active_run',None); st.rerun()
+    st.subheader('Analyzing selected area')
+    st.progress(float(status.get('progress',0)),text=status.get('message','Starting worker'))
+    st.caption('You can leave this page and recover the job from Saved sessions. Only one analysis runs at a time.')
+    if (Path(run_dir)/'preview.jpg').exists(): st.image(str(Path(run_dir)/'preview.jpg'),width=640)
+    if st.button('Cancel analysis',key='cancel_job'):
+        cancel_job(run_dir); st.info('Cancellation requested. The current inference call will finish before the worker stops.')
+
+if st.session_state.get('active_run'):
+    # Keep the uploader mounted while polling: otherwise Streamlit removes its
+    # widget state and the selected source disappears after the job finishes.
+    media_uploader(disabled=True)
+    job_progress(st.session_state.active_run); st.stop()
+if st.session_state.get('last_error'):
+    st.error(st.session_state.last_error); st.caption('The last successful result, if shown, is unchanged.')
+
+if page=='Model lab':
+    st.subheader('Model comparison')
+    evaluation=ROOT/'docs'/'model_evaluation.json'
+    if evaluation.is_file():
+        data=json.loads(evaluation.read_text(encoding='utf-8')); st.info(data.get('decision','Comparison available'))
+        if 'baseline' in data and 'candidate' in data:
+            labels={'mae':'Average count error (heads)','rmse':'Count RMSE (heads)','bias':'Count bias (heads)','precision':'Detection precision','recall':'Detection recall'}
+            metrics=pd.DataFrame({'Current model':data['baseline'],'Trained candidate':data['candidate']}).reindex(labels).rename(index=labels)
+            st.dataframe(metrics.style.format('{:.3f}'),width='stretch')
+            st.caption(f"Compared on {int(data['baseline']['images'])} test images. Lower count error is better. Precision and recall use IoU 0.5; these are not a campus accuracy percentage.")
+        if data.get('completed_epochs'): st.caption(f"{data['hardware']} · {data['completed_epochs']} epochs · {data['split_images']['train']} training images · {data['split_images']['tune']} validation images")
+        st.write(data.get('limitation',''))
+        with st.expander('Experiment details'): st.json(data)
+    else: st.info('No completed local model comparison is available yet. No accuracy percentage is claimed.')
+    st.markdown('### Training data integrity')
+    st.warning('The original local dataset has corrupted repeated boxes and is blocked from training. Use the new audited SCUT-HEAD conversion instead.')
+    st.markdown('[SCUT-HEAD research dataset](https://github.com/HCIILAB/SCUT-HEAD-Dataset-Release) · Academic research use only.')
+    st.caption('A benchmark improvement does not establish accuracy at your campus. Validate representative camera footage before operational use.')
+    st.stop()
+
+if page=='Saved sessions':
+    st.subheader('Saved sessions & storage')
+    used=storage_bytes(OUTPUTS); st.progress(min(used/(2*1024**3),1.),text=f'{mb(used)} of 2 GB workspace budget')
+    inventory=session_inventory(SESSIONS)
+    for item in inventory:
+        directory=SESSIONS/item['id']
+        with st.expander(f"Session {item['id'][:8]} · {mb(item['bytes'])} · {len(item['runs'])} saved runs"):
+            active=False
+            for p in directory.glob('*/status.json'):
+                status=read_status(p.parent)
+                if status.get('state') in ACTIVE_STATES:
+                    active=True; st.write(status.get('message','Running analysis'))
+                    if st.button('Open job progress',key='job_'+str(p.parent)):
+                        st.session_state.active_run=str(p.parent); st.rerun()
+            for record in item['runs']:
+                if st.button(record['file_name']+' · '+record.get('created_at',''),key='open_'+item['id']+record['signature']): st.session_state.saved_review=record
+            confirm=st.checkbox('I have downloaded the outputs I need',key='confirm_'+item['id'],disabled=active)
+            if st.button('Delete saved session',key='delete_'+item['id'],disabled=active or not confirm):
+                with FileLock(str(OUTPUTS/'.dispatch.lock'),timeout=5):
+                    if any(read_status(p.parent).get('state') in ACTIVE_STATES for p in directory.glob('*/status.json')): st.error('This session has an active job.')
+                    else:
+                        if item['id']==st.session_state.session_id: reset_session()
+                        else: clear_session(SESSIONS,item['id'])
+                        st.session_state.pop('saved_review',None); st.rerun()
+    if not inventory: st.caption('Completed and interrupted analyses will appear here.')
+    if st.session_state.get('saved_review'): render_results(st.session_state.saved_review)
+    st.stop()
+
+uploaded=media_uploader()
 if uploaded is None:
-    with st.container(border=True):
-        st.subheader('Your footage is the starting point')
-        st.write('Add a camera recording or image above to inspect it before analysis.')
-        a,b,c = st.columns(3)
-        a.metric('Source', 'Not selected')
-        b.metric('Analysis rate', f'{analysis_fps} FPS')
-        c.metric('Space capacity', f'{capacity} people')
-        st.caption('No counts are displayed until an analysis completes successfully.')
-    st.markdown('### Review workflow')
-    a,b,c = st.columns(3)
-    a.markdown('**01 · Inspect the source**\n\nCheck the camera view and set the capacity for the visible area.')
-    b.markdown('**02 · Review detections**\n\nCompare the original and annotated footage, then inspect sampled peaks.')
-    c.markdown('**03 · Save the evidence**\n\nExport compressed video, timestamped counts and a PDF report.')
-    st.info('Recorded-media prototype · Counts are visible detections, not unique visitors. Live cameras and calibrated density measurements are not available.')
+    if st.session_state.get('result'): render_results(st.session_state.result)
+    else:
+        with st.container(border=True):
+            st.subheader('Review an entrance, corridor or event area')
+            st.write('Add footage, draw the area you want to monitor, and set its capacity. The analysis flags sustained exceedances and lets you jump to the relevant moments.')
+            st.caption('Select Saved sessions to reopen previous results. Source footage and analysis stay on this computer.')
     st.stop()
 
-raw = uploaded.getbuffer()
-upload_hash = hashlib.sha256(raw).hexdigest()
-ext = Path(uploaded.name).suffix.lower()
-is_video = ext.lstrip('.') in config.ALLOWED_VIDEO_TYPES
-settings = dict(pipeline_version=config.PROJECT_VERSION, weights_path=str(Path(weights).resolve()), conf=conf, iou=0.5, imgsz=imgsz,
-                max_capacity=int(capacity), classification_mode=classification_mode,
-                analysis_fps=float(analysis_fps), max_width=max_width)
-weight_file = Path(weights)
-if not weight_file.is_file():
-    st.error('Model checkpoint was not found. Choose a local .pt checkpoint in Analysis settings.')
-    st.stop()
-settings['weights_mtime_ns'] = weight_file.stat().st_mtime_ns
-signature = hashlib.sha256((upload_hash + json.dumps(settings, sort_keys=True)).encode()).hexdigest()[:24]
-session_dir.mkdir(parents=True, exist_ok=True)
-source = session_dir / ('input' + ext)
-if st.session_state.get('upload_hash') != upload_hash:
-    # Only replace inputs owned by this app session. Never touch the original media.
-    for old_input in session_dir.glob('input.*'):
-        old_input.unlink()
-    source.write_bytes(raw)
-    st.session_state.upload_hash = upload_hash
-    st.session_state.pop('result', None)
-elif not source.exists():
-    source.write_bytes(raw)
+raw=uploaded.getbuffer(); digest=hashlib.sha256(raw).hexdigest(); suffix=Path(uploaded.name).suffix.lower()
+is_video=suffix.lstrip('.') in config.ALLOWED_VIDEO_TYPES
+source=session_dir/('input'+suffix)
+if st.session_state.get('upload_hash')!=digest or not source.exists():
+    try:
+        OUTPUTS.mkdir(parents=True,exist_ok=True)
+        with FileLock(str(OUTPUTS/'.dispatch.lock'),timeout=5):
+            check_storage_budget(OUTPUTS,len(raw))
+            if st.session_state.get('upload_hash') and st.session_state.upload_hash!=digest:
+                st.session_state.session_id=uuid.uuid4().hex; session_dir=SESSIONS/st.session_state.session_id; source=session_dir/('input'+suffix)
+            session_dir.mkdir(parents=True,exist_ok=True); source.write_bytes(raw)
+        st.session_state.upload_hash=digest; st.session_state.pop('result',None)
+    except Exception as exc: st.error(str(exc)); st.stop()
 del raw
 
-with st.container(border=True):
-    left, right = st.columns([1.8, 1])
-    with left:
-        st.subheader('01 · Source inspection')
-        st.write(Path(uploaded.name).name)
-        if is_video:
-            st.video(str(source))
-            st.caption('If your browser cannot play this source codec, inspect its first frame below. Analysis uses the local decoder.')
-            with st.expander('Source still frame'):
-                cap = cv2.VideoCapture(str(source))
-                try:
-                    readable, first_frame = cap.read()
-                finally:
-                    cap.release()
-                if readable:
-                    st.image(cv2.cvtColor(first_frame, cv2.COLOR_BGR2RGB), use_container_width=True)
-                else:
-                    st.warning('The source decoder could not read a first frame. Re-export as H.264 MP4.')
-        else:
-            st.image(str(source), use_container_width=True)
-    with right:
-        st.subheader('Analysis plan')
-        st.metric('Source file', mb(uploaded.size))
-        st.write(f'**Capacity:** {capacity:,} people')
-        st.write(f'**Classification:** {mode_label}')
-        if is_video:
-            st.write(f'**Sampling:** up to {analysis_fps} frames / second')
-            st.write(f'**Export:** H.264 · up to {max_width}px wide')
-        st.caption('Output resolution affects the saved preview only. Detection uses the source frame and the model input size.')
-        analyze = st.button('Run video analysis' if is_video else 'Run image analysis', type='primary', use_container_width=True)
-        st.caption('Results are sampled observations. Short events between samples may be missed.')
-
-current = st.session_state.get('result')
-if current and current.get('signature') != signature:
-    st.info('Settings changed. Analyze again to generate a result with these settings. The previous result below retains its original settings.')
-
-if analyze:
-    run_dir = session_dir / signature
-    run_dir.mkdir(exist_ok=True)
-    cached = run_dir / 'result.json'
-    st.session_state.pop('last_error', None)
+@st.cache_data(show_spinner=False,max_entries=4)
+def inspect_source(path,identity,video):
+    if not video: return cv2.imread(path),0.,0.
+    cap=cv2.VideoCapture(path)
     try:
-        if cached.exists():
-            saved = json.loads(cached.read_text(encoding='utf-8'))
-            if not Path(saved.get('annotated_path', '')).is_file():
-                cached.unlink()
-        if cached.exists():
-            record = json.loads(cached.read_text(encoding='utf-8'))
+        ok,frame=cap.read(); fps=cap.get(cv2.CAP_PROP_FPS); total=cap.get(cv2.CAP_PROP_FRAME_COUNT)
+        return frame if ok else None,total/fps if fps>0 else 0.,fps
+    finally: cap.release()
+
+frame,duration,source_fps=inspect_source(str(source),digest,is_video)
+if frame is None: st.error('This file cannot be decoded. Try an H.264 MP4 or a JPEG image.'); st.stop()
+st.subheader(Path(uploaded.name).name)
+st.caption(f"{frame.shape[1]} × {frame.shape[0]} · {mb(uploaded.size)}"+(f' · {duration:.1f}s source duration' if is_video else ' · Still image'))
+left,right=st.columns([2.3,1])
+with left:
+    geometry_key='geometry_'+digest[:16]
+    scene=scene_editor(frame,key='scene_'+digest[:16],geometry=st.session_state.get(geometry_key)) or {'polygon':None,'line':None}
+    st.session_state[geometry_key]=scene
+    with st.expander('Original source playback'):
+        if is_video:
+            st.video(str(source)); st.caption('If the browser cannot play this codec, use the locally decoded editor frame above.')
+        else: st.image(str(source),width='stretch')
+with right:
+    st.markdown('### Analysis setup'); st.write('**Location:** '+location)
+    st.write(f"**Capacity:** {capacity} {'person' if capacity==1 else 'people'} in selected area"); st.write(f'**Event rule:** exceed capacity for {event_seconds:g}s')
+    flow_key='flow_choice_'+digest[:16]
+    flow=st.checkbox('Estimate directional flow',value=st.session_state.get(flow_key,False),disabled=not is_video)
+    st.session_state[flow_key]=flow
+    st.caption('Draw an orange line first. The arrow indicates positive crossing direction. At least 5 samples/second required.')
+    invalid=None
+    try:
+        polygon=validate_polygon(scene.get('polygon')); line=validate_line(scene.get('line')) if flow else None
+        if flow and analysis_fps<5: raise ValueError('Increase sampling to at least 5 FPS for flow.')
+        if duration>600: raise ValueError('Trim the recording to 10 minutes or less.')
+        if not Path(weights).is_file(): raise ValueError('The selected model file is missing.')
+    except (ValueError,TypeError) as exc: invalid=str(exc)
+    if invalid: st.error(invalid)
+    analyze=st.button('Analyze selected area',type='primary',disabled=bool(invalid),width='stretch')
+    st.caption('Head centres inside the cyan area are counted. Draw and apply the area before starting.')
+if invalid: st.stop()
+settings=dict(pipeline_version=config.PROJECT_VERSION,weights_path=str(Path(weights).resolve()),weights_mtime_ns=Path(weights).stat().st_mtime_ns,conf=conf,iou=.5,imgsz=imgsz,max_capacity=int(capacity),classification_mode='manual',analysis_fps=float(analysis_fps),max_width=max_width,roi_polygon=polygon,flow_line=line,event_seconds=float(event_seconds),location=location)
+signature=hashlib.sha256((digest+json.dumps(settings,sort_keys=True)).encode()).hexdigest()[:24]
+if analyze:
+    run_dir=session_dir/signature
+    try:
+        cached=run_dir/'result.json'
+        if cached.is_file() and Path(json.loads(cached.read_text(encoding='utf-8'))['annotated_path']).is_file():
+            st.session_state.result=json.loads(cached.read_text(encoding='utf-8')); st.session_state.pop('last_error',None)
         else:
-            # Identical reruns use the cache; old run artifacts are pruned after success.
-            model = get_model(weights)
-            model_classes = ', '.join(model.names.values())
-            model_name = str(model.model.yaml.get('yaml_file', 'YOLO'))
-            progress = st.progress(0.0, text='Preparing media…')
-            preview = st.empty()
-            last_preview = [0.0]
-            def on_frame(index, total, frame, count, level, auto):
-                now = time.perf_counter()
-                if now - last_preview[0] >= 0.5:
-                    last_preview[0] = now
-                    progress.progress(min(index / total, 1.0) if total else 0.0,
-                                      text=f'Frame {index:,} / {total:,} · {count} visible heads')
-                    preview.image(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), use_container_width=True)
-            started = time.perf_counter()
-            with st.spinner('Analyzing on CPU. Long clips may take several minutes…'):
-                common = dict(weights_path=weights, source_path=str(source), conf=conf, iou=0.5,
-                              imgsz=imgsz, classification_mode=classification_mode, max_capacity=int(capacity))
-                if is_video:
-                    output = run_dir / 'annotated.mp4'
-                    result = run_video_detection(**common, output_path=str(output), frame_callback=on_frame,
-                                                 analysis_fps=float(analysis_fps), max_width=max_width)
-                    data = asdict(result)
-                    levels = result.per_frame_auto_crowd_levels if classification_mode == 'auto' else [get_crowd_level(n, int(capacity)) for n in result.per_frame_counts]
-                    data['per_frame_levels'] = levels
-                else:
-                    output = run_dir / 'annotated.jpg'
-                    annotated, count, manual, auto, _ = run_image_detection(**common)
-                    if not cv2.imwrite(str(output), annotated, [cv2.IMWRITE_JPEG_QUALITY, 88]):
-                        raise IOError('Cannot save annotated image. Check available disk space.')
-                    level = auto if classification_mode == 'auto' else manual
-                    data = dict(max_head_count=count, avg_head_count=float(count), final_head_count=count,
-                                final_crowd_level=level, peak_crowd_level=level, per_frame_counts=[count],
-                                per_frame_levels=[level], timestamps=[0.0], processed_frames=1,
-                                processing_time_seconds=time.perf_counter()-started, input_bytes=uploaded.size,
-                                output_bytes=output.stat().st_size, source_fps=None, sample_fps=None)
-                record = dict(data, signature=signature, id=signature, file_name=Path(uploaded.name).name,
-                              media_type='video' if is_video else 'image', annotated_path=str(output),
-                              settings=settings, model_name=model_name, model_classes=model_classes,
-                              crowd_level=data['peak_crowd_level'], created_at=datetime.now(timezone.utc).isoformat())
-                atomic_json(cached, record)
-            progress.empty()
-            preview.empty()
-        retain_run(session_dir, signature)
-        st.session_state.result = record
+            start_job(run_dir,dict(settings=settings,source_path=str(source),file_name=Path(uploaded.name).name,media_type='video' if is_video else 'image'))
+            st.session_state.active_run=str(run_dir); st.session_state.pop('last_error',None)
         st.rerun()
-    except Exception as exc:
-        st.session_state.last_error = str(exc)
-
-if st.session_state.get('last_error'):
-    st.error('Latest analysis failed: ' + st.session_state.last_error)
-    st.caption('Any result below belongs to the last successful run, not the failed attempt.')
-
-record = st.session_state.get('result')
-if record and not Path(record['annotated_path']).is_file():
-    st.warning('The saved result file is missing. Run analysis again to rebuild it.')
-    record = None
-if record:
-    st.divider()
-    st.subheader('02 · Detection review')
-    st.caption('Results for ' + record['file_name'] + ' · ' + record.get('created_at', 'Earlier session'))
-    for warning in record.get('warnings', []):
-        st.warning(warning)
-    a,b,c,d = st.columns(4)
-    a.metric('Peak sampled count', record['max_head_count'])
-    b.metric('Average visible count', f"{record['avg_head_count']:.1f}")
-    c.metric('Peak crowd level', record['peak_crowd_level'].replace(' Crowd',''))
-    d.metric('Annotated file', mb(record['output_bytes']))
-    view = st.radio('Review panel', ['Annotated footage', 'Occupancy timeline', 'Export results'], horizontal=True, label_visibility='collapsed')
-    if view == 'Annotated footage':
-        if record['media_type'] == 'video':
-            st.video(record['annotated_path'])
-            st.caption(f"{record['output_width']} × {record['output_height']} · {record['sample_fps']:.2f} sampled FPS · H.264 · audio omitted")
-        else:
-            st.image(record['annotated_path'], use_container_width=True)
-    elif view == 'Occupancy timeline':
-        if record['media_type'] == 'video':
-            chart = pd.DataFrame({'Source time (s)': record['timestamps'], 'Visible count': record['per_frame_counts']})
-            if record['settings']['classification_mode'] == 'manual':
-                chart['Configured capacity'] = record['settings']['max_capacity']
-            st.line_chart(chart.set_index('Source time (s)'), color=['#b7e27c', '#f2ab69'] if 'Configured capacity' in chart else ['#b7e27c'])
-            peak_index = record['per_frame_counts'].index(record['max_head_count'])
-            st.write(f"First sampled peak: **{record['timestamps'][peak_index]:.2f}s** · Last sampled count: **{record['final_head_count']}**")
-            st.caption(f"{record['processed_frames']:,} sampled frames · {record['source_duration']:.2f}s of source video · {record['fps_processed']:.2f} samples processed / wall-clock second")
-        st.write('Final crowd level: ' + record['final_crowd_level'])
-        st.write('Actual model: ' + record['model_name'] + ' · classes: ' + record['model_classes'])
-        st.write('Processing time: ' + f"{record['processing_time_seconds']:.2f}s")
-        st.write('Input ' + mb(record['input_bytes']) + ' → output ' + mb(record['output_bytes']))
-        with st.expander('Settings used for this result'):
-            st.json({k:v for k,v in record['settings'].items() if k not in ('weights_path','weights_mtime_ns')})
-        st.caption('Peak and final status are different summaries. Counts are sampled detections, not unique people. Occupancy levels are configured rules, not validated safety predictions.')
-    elif view == 'Export results':
-        st.subheader('03 · Export evidence')
-        st.caption('Download only the artifacts you need. Video exports omit audio.')
-        path = Path(record['annotated_path'])
-        st.download_button('Download annotated video' if record['media_type'] == 'video' else 'Download annotated image',
-                           data=path.read_bytes(), file_name=Path(record['file_name']).stem + '-annotated' + path.suffix,
-                           mime='video/mp4' if record['media_type'] == 'video' else 'image/jpeg', use_container_width=True)
-        st.download_button('Download frame data (CSV)', csv_bytes(record), file_name='crowdvision-counts.csv', mime='text/csv', use_container_width=True)
-        if st.button('Prepare PDF report', use_container_width=True):
-            try:
-                report_path = path.parent / 'report.pdf'
-                generate_pdf_report(record, str(report_path))
-                st.session_state.pdf_for = record['signature']
-            except Exception as exc:
-                st.error('Report could not be generated: ' + str(exc))
-        if st.session_state.get('pdf_for') == record['signature'] and (path.parent / 'report.pdf').exists():
-            st.download_button('Download PDF report', (path.parent/'report.pdf').read_bytes(), file_name='crowdvision-report.pdf', mime='application/pdf', use_container_width=True)
-    st.markdown('<div class="privacy">Local processing. Your source file is never modified. Clear session storage after downloading your results.</div>', unsafe_allow_html=True)
+    except Exception as exc: st.error(str(exc))
+if st.session_state.get('result'):
+    if st.session_state.result['signature']!=signature: st.info('Setup changed. Results below retain their original area and settings. Analyze again to apply changes.')
+    render_results(st.session_state.result)

@@ -1,0 +1,44 @@
+{
+  "status": "complete",
+  "eligible_for_promotion": false,
+  "baseline_confidence": 0.35,
+  "candidate_confidence": 0.25,
+  "baseline": {
+    "mae": 1.2793522267206479,
+    "rmse": 3.102826189842491,
+    "bias": 0.02834008097165992,
+    "images": 494,
+    "precision": 0.9373589771140002,
+    "recall": 0.9387711180458409
+  },
+  "candidate": {
+    "mae": 1.4412955465587045,
+    "rmse": 4.674853047117711,
+    "bias": 0.8137651821862348,
+    "images": 494,
+    "precision": 0.917792676637442,
+    "recall": 0.9574948886258474
+  },
+  "limitation": "Existing checkpoint training exposure unknown; not an independently unseen test set.",
+  "decision": "Existing model retained: the cloud-trained candidate increased held-out counting MAE and RMSE.",
+  "experiment": "scut_gpu_20261027_132838",
+  "hardware": "Google Colab Tesla T4",
+  "completed_date": "2026-10-27",
+  "maximum_epochs": 30,
+  "completed_epochs": 21,
+  "training_seconds": 1860.82,
+  "split_images": {
+    "train": 1440,
+    "tune": 456,
+    "holdout": 494
+  },
+  "dataset": "SCUT-HEAD Part B, official splits with exact-image duplicates excluded",
+  "dataset_source": "https://github.com/HCIILAB/SCUT-HEAD-Dataset-Release",
+  "dataset_license": "Academic research only",
+  "baseline_sha256": "667b4a6da2b8739b4a11e2070e281506e6303de76589cb2832d80c261b99004c",
+  "candidate_sha256": "f881fded822ffe7e7435e5ded728cdbafb36099c3656ad5d10f8719dcaf27a35",
+  "promotion_rule": "MAE >2% better, RMSE no worse, precision and recall drop at most 0.02",
+  "evaluation_imgsz": 640,
+  "training_imgsz": 768,
+  "metric_notes": "MAE/RMSE/bias in heads per image. Precision/recall at IoU 0.5 and independently validation-selected confidence; not mAP or campus accuracy."
+}

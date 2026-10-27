@@ -94,6 +94,10 @@ def detect_heads_in_frame(
     """
     if native_head_class is None:
         native_head_class = _model_has_native_head_class(model)
+    # A model containing both classes must not count a head and its person twice.
+    class_ids = resolve_class_ids(model.names, config.NATIVE_HEAD_CLASS_NAMES if native_head_class else ('person',))
+    if getattr(model, 'task', 'detect') != 'detect':
+        raise ValueError('Choose an object-detection model with head or person classes.')
 
     # The cached model is shared by Streamlit sessions; serialize mutable predictor state.
     with _INFERENCE_LOCK:
@@ -159,6 +163,7 @@ def run_detection(
     classification_mode: str = "manual",
     max_capacity: Optional[int] = None,
     show_body_box_estimate: bool = config.SHOW_BODY_BOX_ESTIMATE,
+    roi_polygon=None,
 ) -> tuple:
     """
     Detect heads in a single image. Returns
@@ -193,6 +198,8 @@ def run_detection(
         show_body_box_estimate=show_body_box_estimate,
     )
 
+    from src.core.scene import in_zone, draw_scene
+    detections = in_zone(detections, frame.shape, roi_polygon)
     head_count = len(detections)
     crowd_level = get_crowd_level(head_count, max_capacity=max_capacity if classification_mode == "manual" else None)
     auto_crowd_level = get_auto_crowd_level(detections, frame.shape[:2])
@@ -204,6 +211,7 @@ def run_detection(
 
     annotated = draw_detections(frame.copy(), detections)
     annotated = draw_overlay(annotated, head_count, display_crowd_level)
+    annotated = draw_scene(annotated, roi_polygon)
 
     return annotated, head_count, crowd_level, auto_crowd_level, auto_risk_level
 

@@ -885,6 +885,7 @@ def _parse_label_file(label_path: str, nc: int) -> dict:
         "malformed_rows": 0,
         "class_out_of_range": 0,
         "bad_coords": 0,
+        "duplicate_rows": 0,
         "reasons": [],
     }
 
@@ -895,6 +896,7 @@ def _parse_label_file(label_path: str, nc: int) -> dict:
         result["reasons"].append(f"could not read file: {exc}")
         return result
 
+    seen_boxes = set()
     for line_no, line in enumerate(lines, start=1):
         result["total_rows"] += 1
         tokens = line.split()
@@ -908,7 +910,10 @@ def _parse_label_file(label_path: str, nc: int) -> dict:
             continue
 
         try:
-            class_id = int(float(tokens[0]))
+            class_value = float(tokens[0])
+            if not np.isfinite(class_value) or not class_value.is_integer():
+                raise ValueError('Class must be a finite integer')
+            class_id = int(class_value)
             x, y, w, h = (float(t) for t in tokens[1:])
         except ValueError:
             result["malformed_rows"] += 1
@@ -931,12 +936,17 @@ def _parse_label_file(label_path: str, nc: int) -> dict:
             if len(result["reasons"]) < 3:
                 result["reasons"].append(f"line {line_no}: x/y center out of [0,1] range: '{line}'")
             continue
-        if w <= 0.0 or h <= 0.0 or w > 1.0 or h > 1.0:
+        if not np.isfinite([x,y,w,h]).all() or w <= 0.0 or h <= 0.0 or w > 1.0 or h > 1.0:
             result["bad_coords"] += 1
             if len(result["reasons"]) < 3:
                 result["reasons"].append(f"line {line_no}: invalid width/height: '{line}'")
             continue
 
+        box=(class_id,x,y,w,h)
+        if box in seen_boxes:
+            result['duplicate_rows'] += 1
+            continue
+        seen_boxes.add(box)
         result["valid_boxes"] += 1
 
     return result
@@ -1093,6 +1103,10 @@ def validate_dataset(data_yaml_path: str, logger: Optional[logging.Logger] = Non
 
             label_path = os.path.join(labels_dir, stem + ".txt")
             stats = _parse_label_file(label_path, nc=nc)
+            if stats['duplicate_rows']:
+                raise ValueError(f'[{split}] {stem}.txt contains {stats["duplicate_rows"]} duplicate boxes. Repair annotations before training.')
+            if stats['malformed_rows'] or stats['bad_coords'] or stats['class_out_of_range']:
+                raise ValueError(f'[{split}] Invalid labels in {stem}.txt: {stats["reasons"]}')
 
             total_valid_boxes += stats["valid_boxes"]
             malformed_total += stats["malformed_rows"]

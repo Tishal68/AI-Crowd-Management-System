@@ -1,4 +1,17 @@
-# Validation — 26 October 2026
+# Validation
+
+## Campus workflow — 28 October 2026
+
+- 30 regression tests passed on Windows/Python 3.12. These include area geometry, boundary inclusion, confirmed directional crossings, capacity duration/gap rules, variable decoder timestamps, duplicate annotation detection, cancellation cleanup, storage reservations, cross-session job admission, failed-worker recovery, PDF generation and workspace navigation.
+- A browser run with the actual packaged detector on a controlled six-second repeated-frame fixture completed 30 samples, produced one 5.8-second sampled capacity event and an evidence thumbnail, and generated a downloadable PDF. This fixture checks the workflow, not detector accuracy or movement tracking.
+- Fixture input: 10,434,360 bytes; annotated H.264 output: 575,989 bytes (about 5.5%). Browser output playback reported six seconds, readyState 4 and no media error.
+- A real short recording also completed with a drawn area: the selected area peaked at eight heads. No ground truth exists for that clip; this is execution evidence only.
+- A second browser run confirmed that the uploaded file, selected polygon and enabled flow setting survived the background job. PDF download and reopening a completed result from Saved sessions succeeded.
+- Desktop and 390-pixel mobile layouts were visually inspected; the mobile page and main content had no horizontal overflow.
+- Colab Tesla T4 training completed 21 epochs with early stopping. The comparison used 494 test images after exact-image deduplication. Existing/candidate counting MAE was 1.279/1.441 and RMSE 3.103/4.675. Candidate promotion was rejected. Details, hashes and limitations are in `TRAINING.md` and `model_evaluation.json`.
+- Installed dependency consistency passed. GitHub CI is tracked separately; local passing results do not establish remote CI completion.
+
+## Earlier checks — 26 October 2026
 
 ## Automated and execution checks
 
@@ -19,6 +32,6 @@ This benchmark deliberately used an empty synthetic detector to isolate decoding
 
 ## Scope and limitations
 
-These results do not establish counting accuracy, robustness to a new camera, physical crowd density, unique-person identity or safe crowd conditions. Sampling and resizing trade temporal/spatial detail for CPU and storage use. Very low source bitrate can produce artifacts or hit the hard export budget; use a shorter clip or lower resolution. Model training and a complete held-out evaluation were not performed during this repair.
+These execution results do not establish counting accuracy, robustness to a new camera, physical crowd density, unique-person identity or safe crowd conditions. Sampling trades temporal detail for CPU and storage use. Very low source bitrate can produce artifacts or hit the hard export budget; use a shorter clip or lower resolution. The later Colab comparison is documented above and has separate limitations.
 
 Supported dependency ranges are in requirements.txt. Direct versions used for local validation are recorded in requirements-tested.txt. GitHub CI runs regression checks separately; local passing results do not imply remote CI has completed.
