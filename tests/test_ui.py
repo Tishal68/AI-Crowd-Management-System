@@ -1,10 +1,11 @@
 """Verify the workspace starts and clearing storage resets uploader identity."""
 import unittest
+from pathlib import Path
 from streamlit.testing.v1 import AppTest
 
 class WorkspaceTests(unittest.TestCase):
     def test_workspace_and_session_reset(self):
-        app = AppTest.from_file('app.py', default_timeout=30).run()
+        app = AppTest.from_file(str(Path(__file__).resolve().parents[1]/'app.py'), default_timeout=30).run()
         self.assertFalse(app.exception)
         self.assertEqual(app.title[0].value, 'Crowd occupancy & flow review')
         old_id = app.session_state['session_id']
