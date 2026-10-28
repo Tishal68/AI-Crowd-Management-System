@@ -170,7 +170,7 @@ def run_detection(
     (annotated_frame, head_count, crowd_level, auto_crowd_level, auto_risk_level).
 
     `preloaded_model` is optional: pass an already-loaded YOLO instance
-    (e.g. from detection_service's cached model) to skip reloading the
+    (e.g. from the web worker's cached model) to skip reloading the
     model from disk on every call. If omitted, the model is loaded fresh
     exactly as before.
 

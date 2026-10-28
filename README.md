@@ -6,17 +6,32 @@ Help a campus event team review recorded entrances and gathering areas: draw the
 
 ## Windows setup
 
-Python 3.12 is recommended.
+Use Python 3.12 and Node.js 22 for the primary web workspace.
 
 ```powershell
 cd AI-Crowd-Management-System
 py -3.12 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+.\.venv\Scripts\python.exe -m pip install torch==2.13.0 torchvision==0.28.0 --index-url https://download.pytorch.org/whl/cpu
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
+cd frontend
+npm ci
+npm run build
+cd ..
+$env:CROWD_DEV_AUTH='1'
+.\.venv\Scripts\python.exe -m uvicorn server.app:app --host 127.0.0.1 --port 8080
+```
+
+Open http://127.0.0.1:8080. The development authentication bypass is restricted to loopback connections. Stop with Ctrl+C. Dependencies are pinned in `requirements.txt`, `constraints.txt` and `frontend/package-lock.json`. See [web setup, privacy controls and Render deployment](docs/WEB_WORKSPACE.md) for password-protected hosting.
+
+## Legacy Streamlit app
+
+The preserved local interface provides image analysis, historical Streamlit sessions and experimental directional flow. After installing the Python dependencies above, run:
+
+```powershell
 .\.venv\Scripts\python.exe -m streamlit run app.py
 ```
 
-Open http://localhost:8501. Stop with Ctrl+C in the terminal. No API keys are required. `requirements-tested.txt` records the direct versions used for Windows validation; use it instead of `requirements.txt` when you need those exact versions. `imageio-ffmpeg` supplies an encoder if FFmpeg is not installed on PATH. Video compression uses libx264; no uncompressed intermediate video is saved.
+Open http://localhost:8501. Stop with Ctrl+C in the terminal. No API keys are required. `imageio-ffmpeg` supplies an encoder if FFmpeg is not installed on PATH. Video compression uses libx264; no uncompressed intermediate video is saved. The following workflow and local storage instructions describe this legacy interface.
 
 The included default model is `models/head_detector.pt`, a single-class YOLO11m head detector. Select another trusted checkpoint in the sidebar or set `CROWD_MODEL_PATH` before launch. The model must include a head/person class; unrelated classes are rejected. See [model provenance and historical metric limitations](docs/MODEL_CARD.md).
 
@@ -82,7 +97,7 @@ SCUT-HEAD is for academic research. The supplied checkpoint's original training 
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
-Tests cover H.264 output size/duration/sampling, timeline correctness, inference failures and partial-file cleanup, invalid model classes, smoothing reorder, secret redaction, storage containment and PDF generation. A synthetic detector is used in regression tests; passing them does not measure ML accuracy. Real-model smoke results and compression measurements are recorded in `docs/VALIDATION.md`.
+Tests cover H.264 output size/duration/sampling, timeline correctness, inference failures and partial-file cleanup, invalid model classes, smoothing reorder, secret redaction, storage containment, PDF generation, zone summaries and API access controls. A synthetic detector is used in regression tests; passing them does not measure ML accuracy. Real-model execution checks and deployment validation are recorded in [validation notes](docs/WEB_VALIDATION.md).
 
 ## Dataset and training
 
@@ -97,14 +112,16 @@ Training outputs go under `runs/train/`. Evaluate and choose a trained checkpoin
 ## Structure
 
 ```text
-app.py                       dashboard and immutable run flow
+frontend/                   primary React/TypeScript workspace
+server/app.py               authenticated API and single-worker orchestration
+app.py                       preserved local Streamlit interface
 config.py                    paths and detector/training defaults
 src/core/detector.py         image/frame inference
 src/core/video_processor.py  sampling, counts and source timestamps
 src/core/encoding.py         bounded H.264 pipe encoder
 src/core/scene.py            area geometry, capacity events and line crossings
-src/core/tracker.py          experimental tracker utility (not app flow)
-src/services/               model loading, storage, reports and legacy history
+src/core/zones.py            named-zone counts and bounded heatmap summaries
+src/services/               storage, jobs, exports and reports
 src/services/jobs.py         background job dispatch and recovery
 src/services/worker.py       cancellable analysis worker
 src/ui/scene_component/      local interactive area/line editor
