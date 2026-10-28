@@ -25,3 +25,5 @@ dataset/labels/
 
 dataset/data.yaml
 requirements-lock.local.txt
+frontend/node_modules/
+frontend/dist/

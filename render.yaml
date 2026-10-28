@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: campus-vision
+    runtime: docker
+    plan: 1c-2g
+    numInstances: 1
+    healthCheckPath: /healthz
+    autoDeployTrigger: "off"
+    disk:
+      name: campus-recordings
+      mountPath: /var/data
+      sizeGB: 3
+    envVars:
+      - key: CROWD_ENV
+        value: production
+      - key: CROWD_OUTPUTS_ROOT
+        value: /var/data
+      - key: CROWD_RETENTION_DAYS
+        value: "7"
+      - key: CROWD_ACCESS_PASSWORD
+        sync: false
+      - key: CROWD_SESSION_SECRET
+        generateValue: true

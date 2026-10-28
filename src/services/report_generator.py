@@ -50,6 +50,11 @@ def generate_pdf_report(record, output_path=None, chart_image_path=None):
                               ('VALIGN',(0,0),(-1,-1),'TOP'),('BOTTOMPADDING',(0,0),(-1,-1),9),
                               ('TOPPADDING',(0,0),(-1,-1),9),('LINEBELOW',(0,0),(-1,-1),.3,colors.lightgrey)]))
     story += [table, Spacer(1,.5*cm)]
+    if record.get('zones'):
+        story.append(para('Named counting zones', 'Heading2'))
+        for zone in record['zones']:
+            story.append(para(f"{zone['name']}: capacity {zone['capacity']} heads; observed peak {zone['peak']} heads."))
+        story.append(para('Overall counts use the union of zones. Overlapping zones must not be summed. Heatmaps measure detection frequency, not calibrated physical density.'))
     if record.get('events'):
         story.append(para('Sampled capacity exceedances','Heading2'))
         for event in record['events'][:100]:

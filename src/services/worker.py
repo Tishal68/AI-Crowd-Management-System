@@ -15,7 +15,7 @@ from src.services.storage import atomic_json, check_storage_budget
 from src.utils.helpers import get_crowd_level
 
 
-def run(run_dir):
+def run(run_dir, preloaded_model=None):
     run_dir=Path(run_dir)
     job=json.loads((run_dir/'job.json').read_text(encoding='utf-8'))
     settings=job['settings']; start=time.perf_counter(); last=[0.]
@@ -36,7 +36,7 @@ def run(run_dir):
         with FileLock(str(Path(config.OUTPUTS_ROOT)/'.analysis.lock'),timeout=0):
             status('running',progress=0.,message='Loading detector')
             check_storage_budget(config.OUTPUTS_ROOT,0)
-            model=load_model(settings['weights_path'])
+            model=preloaded_model if preloaded_model is not None else load_model(settings['weights_path'])
             common=dict(weights_path=settings['weights_path'],source_path=job['source_path'],
                         imgsz=settings['imgsz'],preloaded_model=model,device='cpu',
                         max_capacity=settings['max_capacity'],roi_polygon=settings['roi_polygon'])
@@ -46,7 +46,8 @@ def run(run_dir):
                 result=process_video(**common,conf_threshold=settings['conf'],iou_threshold=.5,
                                      output_path=str(output),analysis_fps=settings['analysis_fps'],
                                      max_width=settings['max_width'],flow_line=settings.get('flow_line'),
-                                     event_seconds=settings['event_seconds'],frame_callback=progress,cancel_check=cancelled)
+                                     event_seconds=settings['event_seconds'],frame_callback=progress,cancel_check=cancelled,
+                                     zones=settings.get('zones'))
                 data=asdict(result)
                 data['per_frame_levels']=[get_crowd_level(n,settings['max_capacity']) for n in result.per_frame_counts]
                 cap=cv2.VideoCapture(str(output))

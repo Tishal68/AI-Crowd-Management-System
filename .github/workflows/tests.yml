@@ -13,6 +13,38 @@ jobs:
         with:
           python-version: '3.12'
           cache: pip
-      - run: python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+      - run: python -m pip install torch==2.13.0 torchvision==0.28.0 --index-url https://download.pytorch.org/whl/cpu
       - run: python -m pip install -r requirements.txt
       - run: python -m unittest discover -s tests -v
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci && npm run build && npm audit --audit-level=high
+        working-directory: frontend
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t campus-vision .
+      - name: Verify production startup and protected API
+        run: |
+          docker run -d --name campus-smoke -p 127.0.0.1:8080:10000 \
+            -e CROWD_ENV=production \
+            -e CROWD_ACCESS_PASSWORD=ci-only-disposable-password \
+            -e CROWD_SESSION_SECRET=ci-only-disposable-signing-secret-1234567890 \
+            campus-vision
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:8080/healthz; then break; fi
+            sleep 2
+          done
+          curl --fail http://127.0.0.1:8080/healthz
+          test "$(curl --silent -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/api/sessions)" = 401
+      - name: Container logs
+        if: always()
+        run: docker logs campus-smoke || true

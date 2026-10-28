@@ -11,6 +11,7 @@ from src.core.encoding import CompactVideoWriter
 from src.core.detector import detect_heads_in_frame, load_model, _model_has_native_head_class
 from src.utils.helpers import draw_detections, draw_overlay, get_auto_crowd_level, get_crowd_level, resolve_class_ids
 from src.core.scene import in_zone, draw_scene, validate_polygon, FlowTracker, capacity_events
+from src.core.zones import ZoneAnalytics
 
 
 class AnalysisCancelled(RuntimeError):
@@ -47,6 +48,8 @@ class VideoProcessingResult:
     forward_crossings: int = 0
     reverse_crossings: int = 0
     timestamp_basis: str = 'decoder presentation timestamps'
+    zones: list[dict] = field(default_factory=list)
+    heatmap: dict = field(default_factory=dict)
 
 
 def process_video(
@@ -60,6 +63,7 @@ def process_video(
     analysis_fps: float = 5.0, max_width: int = 960,
     roi_polygon=None, flow_line=None, event_seconds: float = 3.,
     cancel_check=None, max_duration_seconds: float = 600., max_samples: int = 9000,
+    zones=None,
 ) -> VideoProcessingResult:
     if classification_mode not in ('manual', 'auto'):
         raise ValueError('Classification mode must be manual or auto.')
@@ -68,6 +72,7 @@ def process_video(
     if max_width < 64:
         raise ValueError('Output width must be at least 64 pixels.')
     roi_polygon = validate_polygon(roi_polygon)
+    spatial = ZoneAnalytics(zones) if zones else None
     if flow_line is not None and analysis_fps < 5:
         raise ValueError('Flow estimation requires at least 5 samples per second.')
     tracker = FlowTracker(flow_line) if flow_line is not None else None
@@ -145,7 +150,7 @@ def process_video(
                 )
             except Exception as exc:
                 raise RuntimeError(f'Detection failed at {timestamp:.2f}s. No valid result was saved.') from exc
-            detections = in_zone(detections, frame.shape, roi_polygon)
+            detections = spatial.observe(detections, frame.shape) if spatial else in_zone(detections, frame.shape, roi_polygon)
             if tracker:
                 if len(detections)>500:
                     raise ValueError('Flow estimation supports at most 500 heads per sample; choose a smaller area or disable flow.')
@@ -156,8 +161,16 @@ def process_video(
             counts.append(count)
             levels.append(auto)
             timestamps.append(timestamp)
-            annotated = draw_overlay(draw_detections(frame.copy(), detections), count, level)
+            annotated = draw_detections(frame.copy(), detections)
+            if spatial:
+                cv2.rectangle(annotated, (8, 8), (min(width-1, 430), 45), (30, 43, 48), -1)
+                cv2.putText(annotated, f'Observed heads in selected zones: {count}', (16, 33), cv2.FONT_HERSHEY_SIMPLEX, .65, (240, 245, 245), 2)
+            else:
+                annotated = draw_overlay(annotated, count, level)
             annotated = draw_scene(annotated, roi_polygon, flow_line)
+            if spatial:
+                for zone in spatial.zones:
+                    annotated = draw_scene(annotated, zone['polygon'])
             annotated = cv2.resize(annotated, (out_w, out_h), interpolation=cv2.INTER_AREA)
             if writer:
                 # Preserve gaps on the constant-rate output timeline without inventing observations.
@@ -183,7 +196,7 @@ def process_video(
     elapsed = time.perf_counter() - started
     chosen = levels if classification_mode == 'auto' else [get_crowd_level(c, max_capacity=max_capacity) for c in counts]
     order = {'Low Crowd': 0, 'Moderate Crowd': 1, 'High Crowd': 2}
-    return VideoProcessingResult(
+    result = VideoProcessingResult(
         output_path, total, len(counts), max(counts), sum(counts) / len(counts), counts[-1], chosen[-1],
         elapsed, len(counts) / elapsed if elapsed else 0, counts,
         levels[-1], {'Low Crowd': 'Safe', 'Moderate Crowd': 'Warning', 'High Crowd': 'Critical'}[levels[-1]], levels,
@@ -193,3 +206,8 @@ def process_video(
         capacity_events(counts,timestamps,max_capacity or config.ASSUMED_MAX_CAPACITY,event_seconds,max(1.,2/sample_fps)),
         tracker.events if tracker else [], tracker.forward if tracker else 0, tracker.reverse if tracker else 0,
     )
+    if spatial:
+        result.zones, result.heatmap = spatial.finish(timestamps, event_seconds, max(1.,2/sample_fps))
+        result.events = [dict(e, zone=z['name']) for z in result.zones for e in z['events']]
+        result.events.sort(key=lambda e: e['start_seconds'])
+    return result

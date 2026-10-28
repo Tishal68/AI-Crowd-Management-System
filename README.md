@@ -1,5 +1,7 @@
 # CrowdVision Campus — occupancy and flow review
 
+**New primary workspace:** a React/FastAPI campus operations dashboard with Overview, Analyze footage, Sessions and Model evaluation. It adds up to five named counting zones, a detection-frequency heatmap, synchronized video/event review and protected exports. See [web setup and Render deployment](docs/WEB_WORKSPACE.md). The Streamlit instructions below remain for the preserved legacy app, image analysis and experimental flow tracking.
+
 Help a campus event team review recorded entrances and gathering areas: draw the area being monitored, set its capacity, identify sustained exceedances, and jump to the relevant moments. The project combines head detection with sampled occupancy, experimental directional crossings, compact H.264 evidence and timestamped reports. It is an academic prototype; it does not predict stampedes or establish that a venue is safe.
 
 ## Windows setup
