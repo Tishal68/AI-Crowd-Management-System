@@ -18,6 +18,8 @@
 
 The GitHub workflow builds the Docker image, starts it in production mode, checks `/healthz` and verifies unauthenticated API rejection. Consult the workflow result for the delivered commit. A successful image build/startup is not a live Render deployment or a Render memory/throughput measurement.
 
+The first delivery, `cd7ada9`, passed all three GitHub jobs (Python tests, frontend build/audit, and Docker build/production startup): https://github.com/Tishal68/AI-Crowd-Management-System/actions/runs/40688509416. A final navigation refinement resets scroll when changing screens; its delivery is checked by the same workflow.
+
 No Render resources were provisioned. No private footage or generated exports were pushed. Screenshots and test media remain local. CPU processing is slower than playback on the tested machine. The proposed 2 GB service requires measurement on actual Render hardware before operational use.
 
 ## Remaining limitations

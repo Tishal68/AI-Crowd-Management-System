@@ -142,6 +142,7 @@ function App() {
   const navigate = (p: string) => {
     setPage(p);
     sessionStorage.setItem("campus-page", p);
+    window.scrollTo(0, 0);
   };
   const refresh = async () => {
     const s = await api("/sessions");
