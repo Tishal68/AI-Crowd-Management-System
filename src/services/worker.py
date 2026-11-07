@@ -67,12 +67,17 @@ def run(run_dir, preloaded_model=None):
                 annotated,count,level,_,_=run_detection(**common,conf=settings['conf'],iou=.5)
                 if not cv2.imwrite(str(output),annotated,[cv2.IMWRITE_JPEG_QUALITY,88]):
                     raise IOError('Cannot write annotated image.')
+                zones=[dict(name=z.get('name', 'Main area'), capacity=z.get('capacity', 80),
+                            polygon=z.get('polygon'), counts=[count], peak=count, events=[])
+                       for z in settings.get('zones', [])]
+                heatmap=dict(grid=[[0]*64 for _ in range(36)], samples=1, measurement='heads')
                 data=dict(max_head_count=count,avg_head_count=float(count),final_head_count=count,
                           final_crowd_level=level,peak_crowd_level=level,per_frame_counts=[count],
                           per_frame_levels=[level],timestamps=[0.],processed_frames=1,
                           input_bytes=Path(job['source_path']).stat().st_size,output_bytes=output.stat().st_size,
                           processing_time_seconds=time.perf_counter()-start,events=[],crossings=[],
-                          forward_crossings=0,reverse_crossings=0,source_duration=0,source_fps=None,sample_fps=None)
+                          forward_crossings=0,reverse_crossings=0,source_duration=0,source_fps=None,sample_fps=None,
+                          zones=zones,heatmap=heatmap)
             if cancelled():
                 output.unlink(missing_ok=True)
                 raise AnalysisCancelled('Analysis cancelled.')

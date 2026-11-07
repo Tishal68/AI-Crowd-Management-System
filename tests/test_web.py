@@ -76,6 +76,28 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(data['file_name'], 'campus.png')
         self.assertTrue((self.sessions / data['id'] / 'poster.jpg').is_file())
         self.assertTrue((self.sessions / data['id'] / 'metadata.json').is_file())
+        # Verify job creation sets media_type='image' for image sessions
+        zones = [dict(name='Main', capacity=10, polygon=None)]
+        r_start = self.client.post(f'/api/sessions/{data["id"]}/start', json=dict(zones=zones), headers=self.headers)
+        self.assertEqual(r_start.status_code, 200)
+        job = web.read(self.sessions / data['id'] / 'job.json')
+        self.assertEqual(job['media_type'], 'image')
+    def test_system_status_and_camera_check(self):
+        self.login()
+        res = self.client.get('/api/system/status')
+        self.assertEqual(res.status_code, 200)
+        s_data = res.json()
+        self.assertIn('detector_ready', s_data)
+        self.assertIn('deployment_mode', s_data)
+        self.assertIn('max_upload_bytes', s_data)
+        # Empty camera source
+        r_empty = self.client.post('/api/camera/check', json={'source': ''}, headers=self.headers)
+        self.assertEqual(r_empty.status_code, 200)
+        self.assertFalse(r_empty.json()['connected'])
+        # Invalid camera source format
+        r_bad = self.client.post('/api/camera/check', json={'source': 'ftp://bad-url'}, headers=self.headers)
+        self.assertEqual(r_bad.status_code, 200)
+        self.assertFalse(r_bad.json()['connected'])
     def test_busy_worker_and_immutable_result_and_cancel(self):
         self.login();key='a'*32;path=self.sessions/key;path.mkdir()
         atomic_json(path/'metadata.json',dict(created=1,file_name='clip.mp4',source='source.mp4'))

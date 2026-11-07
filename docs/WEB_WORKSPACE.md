@@ -20,14 +20,29 @@ $env:CROWD_DEV_AUTH='1'
 
 Open http://127.0.0.1:8080. Stop with Ctrl+C. The explicit development bypass works only on loopback and is disabled in production. Do not expose the development server through a tunnel. For password-protected local testing, unset `CROWD_DEV_AUTH` and set `CROWD_ACCESS_PASSWORD` and `CROWD_SESSION_SECRET` in the environment. `.env.example` documents variables; files are not loaded automatically.
 
-## Workflow
+## Workflow & Primary Operations Navigation
 
-1. **Overview** summarizes saved recordings and worker availability.
-2. **Analyze footage** accepts a recording up to 200 MB, 10 minutes, 4096 × 2160 pixels and 240 source FPS. Invalid media is rejected and partial uploads removed.
-3. Name up to five convex counting zones, set capacities in heads, and choose the minimum sustained duration. Draw corners or edit normalized coordinates with the keyboard. Current settings are stored on the device; completed results retain their original settings.
-4. Start analysis. One CPU worker runs at a time; another start gets an explicit busy response. Navigate away and return through **Sessions**. Cancelling removes partial video. Restarted jobs become failed with a retry explanation, rather than claiming completion or silently resuming a corrupt output.
-5. Select a zone, click an event or use the timeline slider to seek footage. Export counts, structured metadata, event CSV, PDF or annotated MP4 from one menu.
-6. **Model evaluation** presents the actual SCUT-HEAD comparison. The Colab candidate was rejected because counting error increased. No new detector or unsupported accuracy claim is introduced.
+The application organizes campus intelligence into four streamlined operational views with a compact top header, persistent System Ready status, and no permanent sidebar:
+
+1. **Review Footage (Primary Analysis Workspace)**
+   - Unified intake supporting MP4, MOV, AVI, MKV videos (up to 4K, 240 FPS, 10 min) and high-resolution JPG/PNG still photographs.
+   - Dynamic upload validation against server storage budget and configurable quota (`CROWD_MAX_UPLOAD_BYTES`), eliminating arbitrary 200 MB limits while protecting server disk capacity via streaming chunk writes.
+   - **Footage Settings Dropdown**: Accessible directly beside Review Footage in the navigation bar to configure recording defaults (Default Capacity, Buildup Duration, Sampling FPS, Confidence Threshold, and Output Resolution) without clunky modal overlays.
+   - Interactive multi-zone polygon editor for defining up to five named counting zones, per-zone threshold boundaries, and directional movement tracking.
+   - Analysis execution with single CPU/GPU worker serialization, live progress reporting, and full cancellation support.
+   - Synchronized review stage supporting both video playback with detection overlays and single-image analysis view, with detection-frequency heatmap.
+
+2. **Live Monitoring & RTSP Surveillance**
+   - Configurable stream ingestion supporting network IP cameras (RTSP/HTTP/TCP) and local camera devices.
+   - Backend verification endpoint (`/api/camera/check`) tests actual stream availability using OpenCV FFmpeg with credential redaction before claiming connection.
+   - Honest connection reporting: Displays 'Not Connected' when unverified; never fabricates a synthetic preview stream.
+
+3. **Activity & History**
+   - Searchable, filterable archive of past footage analyses.
+   - Quick session switching, status badges, storage footprint auditing, and one-click session deletion.
+
+4. **Reports & Exports**
+   - Centralized export hub for formal PDF inspection certificates, raw union and per-zone occupancy count CSVs, structured incident log CSVs, and annotated video or image exports.
 
 ## Measurements
 

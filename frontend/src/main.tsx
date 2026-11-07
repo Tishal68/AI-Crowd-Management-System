@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   ArrowRight,
   Check,
+  ChevronDown,
   Clock3,
   Download,
   FileText,
@@ -18,6 +19,8 @@ import {
   ScanLine,
   Search,
   Settings2,
+  SlidersHorizontal,
+  VideoOff,
   Trash2,
   Upload,
   Users,
@@ -73,6 +76,19 @@ type Session = {
   };
   result?: Result;
   settings?: Settings;
+  media_type?: string;
+};
+
+type SystemStatus = {
+  detector_ready: boolean;
+  model_name: string;
+  weights_file: string | null;
+  deployment_mode: "local" | "hosted";
+  max_upload_bytes: number;
+  free_storage_bytes: number;
+  total_storage_bytes: number;
+  retention_days: number;
+  active_jobs: number;
 };
 
 const defaults: Settings = {
@@ -140,15 +156,29 @@ function App() {
   const [busy, setBusy] = useState(false);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [footageSettingsOpen, setFootageSettingsOpen] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
 
   // Live monitoring local settings
   const [liveSourceType, setLiveSourceType] = useState("rtsp");
-  const [rtspUrl, setRtspUrl] = useState(() => localStorage.getItem("campus-rtsp-url") || "rtsp://admin:pass@192.168.1.100:554/live");
+  const [rtspUrl, setRtspUrl] = useState(() => localStorage.getItem("campus-rtsp-url") || "");
   const [liveLocation, setLiveLocation] = useState("Campus entrance");
   const [liveCapacity, setLiveCapacity] = useState(80);
-  const [liveActive, setLiveActive] = useState(false);
+  const [cameraCheck, setCameraCheck] = useState<{
+    tested: boolean;
+    connected: boolean;
+    checking: boolean;
+    message: string;
+    width?: number;
+    height?: number;
+    fps?: number;
+  }>({
+    tested: false,
+    connected: false,
+    checking: false,
+    message: "Camera not connected. Enter an RTSP address or camera index and click 'Test Connection'.",
+  });
 
   const [draft, setDraft] = useState<Settings>(() => {
     try {
@@ -171,8 +201,17 @@ function App() {
   };
 
   const refresh = async () => {
-    const s = await api("/sessions");
-    setSessions(s);
+    try {
+      const [s, sys] = await Promise.all([
+        api("/sessions"),
+        api("/system/status").catch(() => null),
+      ]);
+      setSessions(s);
+      if (sys) setSystemStatus(sys);
+    } catch {
+      const s = await api("/sessions");
+      setSessions(s);
+    }
     if (selectedId.current) {
       try {
         setSelected(await api("/sessions/" + selectedId.current));
@@ -180,6 +219,43 @@ function App() {
         selectedId.current = "";
         setSelected(null);
       }
+    }
+  };
+
+  const testCameraConnection = async () => {
+    const target = rtspUrl.trim();
+    if (!target) {
+      setCameraCheck({
+        tested: true,
+        connected: false,
+        checking: false,
+        message: "Please enter an RTSP stream address or camera device index before testing.",
+      });
+      return;
+    }
+    setCameraCheck((prev) => ({
+      ...prev,
+      checking: true,
+      message: "Probing camera stream via backend OpenCV engine...",
+    }));
+    try {
+      const res = await api("/camera/check", "POST", { source: target });
+      setCameraCheck({
+        tested: true,
+        connected: !!res.connected,
+        checking: false,
+        message: res.message,
+        width: res.width,
+        height: res.height,
+        fps: res.fps,
+      });
+    } catch (e) {
+      setCameraCheck({
+        tested: true,
+        connected: false,
+        checking: false,
+        message: (e as Error).message || "Camera connection check failed.",
+      });
     }
   };
 
@@ -225,9 +301,23 @@ function App() {
     navigate("Review Footage");
   };
 
-  // Upload without artificial 200MB restriction
+  // Upload validated against real backend limits and disk constraints
   const upload = (file: File) =>
     action(async () => {
+      const allowedExts = [".mp4", ".mov", ".avi", ".mkv", ".jpg", ".jpeg", ".png"];
+      const ext = file.name.slice(file.name.lastIndexOf(".")).toLowerCase();
+      if (!allowedExts.includes(ext)) {
+        throw Error("Unsupported format. Please upload an MP4, MOV, AVI, MKV recording or JPG, PNG image.");
+      }
+      const maxLimit = systemStatus?.max_upload_bytes || 50 * 1024 ** 3;
+      if (file.size > maxLimit) {
+        throw Error(
+          `File size (${(file.size / 1024 ** 3).toFixed(2)} GB) exceeds the server upload limit of ${(maxLimit / 1024 ** 3).toFixed(0)} GB.`,
+        );
+      }
+      if (systemStatus?.free_storage_bytes && file.size > systemStatus.free_storage_bytes) {
+        throw Error("Insufficient server storage space to receive this file.");
+      }
       setUploadProgress(0);
       try {
         const s = await new Promise<Session>((resolve, reject) => {
@@ -249,9 +339,19 @@ function App() {
               reject(Error("Upload failed. The server response was invalid."));
               return;
             }
-            xhr.status < 300
-              ? resolve(data)
-              : reject(Error(data.detail || "Upload rejected by server storage limits."));
+            if (xhr.status === 413) {
+              reject(Error("File exceeds the server maximum upload limit."));
+            } else if (xhr.status === 507) {
+              reject(Error(data.detail || "Insufficient server storage: disk space or storage quota exceeded."));
+            } else if (xhr.status === 422) {
+              reject(Error(data.detail || "Cannot decode recording. Ensure video is up to 4K 240 FPS / 10 minutes or upload a valid JPG/PNG."));
+            } else if (xhr.status === 409) {
+              reject(Error("Another upload or analysis is in progress. Try again shortly."));
+            } else if (xhr.status >= 300) {
+              reject(Error(data.detail || "Upload rejected by server storage limits."));
+            } else {
+              resolve(data);
+            }
           };
           xhr.send(file);
         });
@@ -366,38 +466,184 @@ function App() {
         </div>
 
         <div className="cv-header-center">
-          <button
-            className="cv-workspace-pill"
-            aria-label="Campus Operations workspace"
-            onClick={() => navigate("Review Footage")}
-          >
+          <div className="cv-workspace-pill">
             <ScanLine size={15} />
             <span>Operations</span>
-          </button>
-          <button
-            className={`cv-model-system-pill ${settingsOpen ? "active" : ""}`}
-            aria-label="Open model and system configuration"
-            onClick={() => setSettingsOpen(!settingsOpen)}
-            aria-expanded={settingsOpen}
-          >
-            <Settings2 size={15} />
-            <span>Model & System</span>
-          </button>
+          </div>
         </div>
 
         <div className="cv-header-right">
-          <div className="cv-status-pill">
-            <span className="cv-status-dot" />
-            <span>System Ready</span>
+          <div className={`cv-status-pill ${systemStatus && !systemStatus.detector_ready ? "warning" : ""}`}>
+            <span className={`cv-status-dot ${systemStatus && !systemStatus.detector_ready ? "warning" : ""}`} />
+            <span>{systemStatus?.detector_ready === false ? "Detector Unavailable" : "System Ready"}</span>
           </div>
+
+          <button
+            className="cv-signout-btn"
+            aria-label="Sign out"
+            onClick={() =>
+              action(async () => {
+                await api("/logout", "POST");
+                setAuth(false);
+              })
+            }
+          >
+            <LogOut size={14} />
+            <span>Sign Out</span>
+          </button>
         </div>
       </header>
 
-      {/* 2. SECONDARY HORIZONTAL SUB-NAV (Exactly 4 Options) */}
+      {/* 2. SECONDARY HORIZONTAL SUB-NAV (4 Options + Footage Settings Dropdown) */}
       <div className="cv-subnav-wrap">
         <nav className="cv-subnav" aria-label="Secondary navigation">
+          {/* Review Footage Navigation Button */}
+          <button
+            className={`cv-subnav-btn ${page === "Review Footage" ? "active" : ""}`}
+            aria-current={page === "Review Footage" ? "page" : undefined}
+            onClick={() => navigate("Review Footage")}
+          >
+            <Play size={16} />
+            <span>Review Footage</span>
+          </button>
+
+          {/* Footage Settings dropdown placed directly beside Review Footage */}
+          <div className="cv-footage-settings-anchor">
+            <button
+              className={`cv-footage-settings-btn ${footageSettingsOpen ? "active" : ""}`}
+              aria-label="Recording and footage analysis settings"
+              aria-expanded={footageSettingsOpen}
+              onClick={() => setFootageSettingsOpen(!footageSettingsOpen)}
+            >
+              <SlidersHorizontal size={14} />
+              <span>Footage Settings</span>
+              <ChevronDown size={13} className={`cv-chevron ${footageSettingsOpen ? "open" : ""}`} />
+            </button>
+
+            {footageSettingsOpen && (
+              <div
+                className="cv-footage-settings-dropdown"
+                role="dialog"
+                aria-label="Footage settings"
+              >
+                <div className="cv-fs-header">
+                  <h4>Footage Settings</h4>
+                  <small>Default analysis parameters for recorded footage</small>
+                </div>
+
+                <div className="cv-fs-body">
+                  <label>
+                    Default Capacity (heads)
+                    <input
+                      type="number"
+                      min="1"
+                      max="10000"
+                      value={draft.zones[0]?.capacity || 80}
+                      onChange={(e) => {
+                        const cap = Number(e.target.value) || 80;
+                        const updated = {
+                          ...draft,
+                          zones: draft.zones.map((z, i) =>
+                            i === 0 ? { ...z, capacity: cap } : z,
+                          ),
+                        };
+                        setDraft(updated);
+                        localStorage.setItem("campus-settings", JSON.stringify(updated));
+                      }}
+                    />
+                  </label>
+
+                  <label>
+                    Buildup Duration (seconds)
+                    <input
+                      type="number"
+                      min="1"
+                      max="60"
+                      step="0.5"
+                      value={draft.event_seconds}
+                      onChange={(e) => {
+                        const sec = Number(e.target.value) || 3;
+                        const updated = { ...draft, event_seconds: sec };
+                        setDraft(updated);
+                        localStorage.setItem("campus-settings", JSON.stringify(updated));
+                      }}
+                    />
+                  </label>
+
+                  <label>
+                    Sampling FPS
+                    <input
+                      type="number"
+                      min="1"
+                      max="10"
+                      value={draft.analysis_fps}
+                      onChange={(e) => {
+                        const fps = Number(e.target.value) || 5;
+                        const updated = { ...draft, analysis_fps: fps };
+                        setDraft(updated);
+                        localStorage.setItem("campus-settings", JSON.stringify(updated));
+                      }}
+                    />
+                  </label>
+
+                  <label>
+                    Confidence Threshold
+                    <input
+                      type="number"
+                      min="0.05"
+                      max="0.90"
+                      step="0.05"
+                      value={draft.conf}
+                      onChange={(e) => {
+                        const conf = Number(e.target.value) || 0.35;
+                        const updated = { ...draft, conf };
+                        setDraft(updated);
+                        localStorage.setItem("campus-settings", JSON.stringify(updated));
+                      }}
+                    />
+                  </label>
+
+                  <label>
+                    Output Resolution
+                    <select
+                      value={draft.imgsz}
+                      onChange={(e) => {
+                        const imgsz = Number(e.target.value) || 640;
+                        const updated = { ...draft, imgsz };
+                        setDraft(updated);
+                        localStorage.setItem("campus-settings", JSON.stringify(updated));
+                      }}
+                    >
+                      <option value="640">640px (Standard / High Detail)</option>
+                      <option value="480">480px (Fast Processing)</option>
+                      <option value="320">320px (Compact / Lightweight)</option>
+                    </select>
+                  </label>
+                </div>
+
+                <div className="cv-fs-footer">
+                  <button
+                    className="cv-btn-secondary"
+                    onClick={() => {
+                      setDraft(defaults);
+                      localStorage.setItem("campus-settings", JSON.stringify(defaults));
+                    }}
+                  >
+                    Reset Defaults
+                  </button>
+                  <button
+                    className="cv-btn-primary"
+                    onClick={() => setFootageSettingsOpen(false)}
+                  >
+                    Done
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Remaining 3 Navigation Tabs */}
           {[
-            { id: "Review Footage" as const, label: "Review Footage", icon: Play },
             { id: "Live Monitoring" as const, label: "Live Monitoring", icon: Video },
             { id: "Activity & History" as const, label: "Activity & History", icon: Layers },
             { id: "Reports" as const, label: "Reports", icon: FileText },
@@ -418,180 +664,6 @@ function App() {
           })}
         </nav>
       </div>
-
-      {/* 3. SETTINGS POPOVER (Modal Dropdown) */}
-      {settingsOpen && (
-        <div
-          className="cv-settings-backdrop"
-          onClick={() => setSettingsOpen(false)}
-        >
-          <div
-            className="cv-settings-popover"
-            role="dialog"
-            aria-label="System settings"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="cv-popover-header">
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <Settings2 size={17} style={{ color: "var(--purple)" }} />
-                <h3>System Settings</h3>
-              </div>
-              <button
-                className="cv-icon-btn"
-                aria-label="Close settings"
-                onClick={() => setSettingsOpen(false)}
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <div className="cv-popover-body">
-              {/* Camera Settings */}
-              <div className="cv-settings-group">
-                <h4>Camera Settings</h4>
-                <label>
-                  RTSP Stream URL
-                  <input
-                    type="text"
-                    placeholder="rtsp://admin:pass@192.168.1.100:554/live"
-                    value={rtspUrl}
-                    onChange={(e) => {
-                      setRtspUrl(e.target.value);
-                      localStorage.setItem("campus-rtsp-url", e.target.value);
-                    }}
-                  />
-                </label>
-                <div className="cv-setting-row">
-                  <span>Connection Status</span>
-                  <span className="cv-badge-ready">
-                    <span className="cv-status-dot" /> Verified Local Stream
-                  </span>
-                </div>
-              </div>
-
-              {/* Analysis Defaults */}
-              <div className="cv-settings-group">
-                <h4>Analysis Defaults</h4>
-                <div className="cv-grid-2">
-                  <label>
-                    Default Capacity (heads)
-                    <input
-                      type="number"
-                      min="1"
-                      max="10000"
-                      value={draft.zones[0]?.capacity || 80}
-                      onChange={(e) => {
-                        const cap = Number(e.target.value) || 80;
-                        setDraft({
-                          ...draft,
-                          zones: draft.zones.map((z, i) =>
-                            i === 0 ? { ...z, capacity: cap } : z,
-                          ),
-                        });
-                      }}
-                    />
-                  </label>
-                  <label>
-                    Buildup Duration (sec)
-                    <input
-                      type="number"
-                      min="1"
-                      max="60"
-                      value={draft.event_seconds}
-                      onChange={(e) =>
-                        setDraft({
-                          ...draft,
-                          event_seconds: Number(e.target.value) || 3,
-                        })
-                      }
-                    />
-                  </label>
-                </div>
-                <div className="cv-grid-2">
-                  <label>
-                    Sampling FPS
-                    <input
-                      type="number"
-                      min="1"
-                      max="10"
-                      value={draft.analysis_fps}
-                      onChange={(e) =>
-                        setDraft({
-                          ...draft,
-                          analysis_fps: Number(e.target.value) || 5,
-                        })
-                      }
-                    />
-                  </label>
-                  <label>
-                    Confidence Threshold
-                    <input
-                      type="number"
-                      min="0.1"
-                      max="0.9"
-                      step="0.05"
-                      value={draft.conf}
-                      onChange={(e) =>
-                        setDraft({
-                          ...draft,
-                          conf: Number(e.target.value) || 0.35,
-                        })
-                      }
-                    />
-                  </label>
-                </div>
-              </div>
-
-              {/* System Information */}
-              <div className="cv-settings-group">
-                <h4>System Information</h4>
-                <div className="cv-info-list">
-                  <div>
-                    <span>Detector Checkpoint</span>
-                    <b>YOLO11m Head Detector</b>
-                  </div>
-                  <div>
-                    <span>Processing Backend</span>
-                    <b>PyTorch Direct (Local Execution)</b>
-                  </div>
-                  <div>
-                    <span>Model Readiness</span>
-                    <b style={{ color: "var(--success)" }}>Ready for Inference</b>
-                  </div>
-                  <div>
-                    <span>Retention Policy</span>
-                    <b>{retention} Days Automatic Storage</b>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="cv-popover-footer">
-              <button
-                className="cv-btn-secondary"
-                onClick={() => {
-                  setDraft(defaults);
-                  localStorage.setItem("campus-settings", JSON.stringify(defaults));
-                }}
-              >
-                Reset Defaults
-              </button>
-              <button
-                className="cv-btn-danger"
-                onClick={() =>
-                  action(async () => {
-                    await api("/logout", "POST");
-                    setAuth(false);
-                  })
-                }
-              >
-                <LogOut size={15} />
-                Sign Out
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* 4. MAIN WORKSPACE CONTENT */}
       <main className="cv-main-content">
@@ -651,7 +723,7 @@ function App() {
                       <Upload size={38} />
                     </div>
                     <p className="cv-dropzone-title">Drag and drop video or image here</p>
-                    <p className="cv-dropzone-subtitle">Supported formats: MP4, AVI, MOV, JPG, PNG</p>
+                    <p className="cv-dropzone-subtitle">Supported formats: MP4, AVI, MOV, JPG, PNG (up to 4K, 10 min)</p>
 
                     <label className="cv-browse-btn">
                       <span>{busy ? "Uploading…" : "Browse Files"}</span>
@@ -691,7 +763,15 @@ function App() {
                     <div className="cv-privacy-indicator">
                       <Lock size={14} />
                       <span>
-                        <strong>Local Processing</strong> · Video inference runs locally on your machine.
+                        {systemStatus?.deployment_mode === "hosted" ? (
+                          <>
+                            <strong>Server Processing</strong> · Video inference runs on the secure application server.
+                          </>
+                        ) : (
+                          <>
+                            <strong>Local Processing</strong> · Video inference runs locally on your machine.
+                          </>
+                        )}
                       </span>
                     </div>
                   </div>
@@ -883,7 +963,7 @@ function App() {
                     RTSP Stream Address
                     <input
                       type="text"
-                      placeholder="rtsp://admin:pass@192.168.1.100:554/live"
+                      placeholder="rtsp://camera.campus.internal:554/live"
                       value={rtspUrl}
                       onChange={(e) => {
                         setRtspUrl(e.target.value);
@@ -894,7 +974,13 @@ function App() {
                 ) : (
                   <label>
                     Local Camera Device
-                    <select>
+                    <select
+                      value={rtspUrl}
+                      onChange={(e) => {
+                        setRtspUrl(e.target.value);
+                        localStorage.setItem("campus-rtsp-url", e.target.value);
+                      }}
+                    >
                       <option value="0">Camera 0 (Default Integrated)</option>
                       <option value="1">Camera 1 (External USB)</option>
                     </select>
@@ -925,31 +1011,73 @@ function App() {
                 <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
                   <button
                     className="cv-btn-primary"
-                    onClick={() => setLiveActive(!liveActive)}
+                    disabled={cameraCheck.checking}
+                    onClick={testCameraConnection}
                   >
-                    {liveActive ? "Stop Surveillance Stream" : "Start Live Surveillance"}
+                    {cameraCheck.checking ? "Testing Stream..." : "Test Stream Connection"}
                   </button>
                 </div>
-                <p className="hint" style={{ marginTop: 12 }}>
-                  Non-blocking threaded capture drains network buffers for sub-30ms latency.
-                </p>
+
+                {/* Honest backend camera connection status */}
+                <div className="cv-camera-status-card" style={{ marginTop: 14 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span
+                      className={`cv-status-dot ${cameraCheck.connected ? "connected" : cameraCheck.checking ? "warning" : ""}`}
+                      style={{
+                        background: cameraCheck.connected
+                          ? "var(--success)"
+                          : cameraCheck.checking
+                          ? "var(--warning)"
+                          : "var(--text-muted)",
+                        boxShadow: cameraCheck.connected ? "0 0 8px var(--success)" : "none",
+                      }}
+                    />
+                    <strong
+                      style={{
+                        fontSize: 13,
+                        color: cameraCheck.connected ? "var(--success)" : "var(--text-primary)",
+                      }}
+                    >
+                      {cameraCheck.connected
+                        ? `Connected (${cameraCheck.width}×${cameraCheck.height} @ ${cameraCheck.fps} FPS)`
+                        : cameraCheck.checking
+                        ? "Probing Stream..."
+                        : cameraCheck.tested
+                        ? "Connection Failed"
+                        : "Not Connected"}
+                    </strong>
+                  </div>
+                  <p className="hint" style={{ marginTop: 6, marginBottom: 0 }}>
+                    {cameraCheck.message}
+                  </p>
+                </div>
               </div>
 
               <div className="panel">
-                <h2>Live Surveillance Preview</h2>
+                <h2>Live Surveillance Monitor</h2>
                 <div className="cv-live-stage">
-                  {liveActive ? (
+                  {cameraCheck.connected ? (
                     <div className="cv-live-placeholder active">
-                      <span className="cv-live-rec-badge">● LIVE STREAMING</span>
+                      <span className="cv-live-rec-badge">● STREAM VERIFIED & READY</span>
                       <p style={{ marginTop: 16 }}>
-                        Connecting to {liveSourceType === "rtsp" ? (rtspUrl || "RTSP URI") : "Local Webcam"}...
+                        Verified live input from {liveSourceType === "rtsp" ? rtspUrl : "Local Camera Device"}
                       </p>
-                      <small>Active zone: {liveLocation} · Threshold: {liveCapacity} heads</small>
+                      <small>
+                        Resolution: {cameraCheck.width}×{cameraCheck.height} · Framerate: {cameraCheck.fps} FPS
+                      </small>
+                      <p style={{ marginTop: 8, fontSize: 12, color: "var(--cyan)" }}>
+                        Active zone: {liveLocation} · Threshold: {liveCapacity} heads
+                      </p>
                     </div>
                   ) : (
                     <div className="cv-live-placeholder">
-                      <Video size={36} style={{ color: "var(--text-muted)", marginBottom: 12 }} />
-                      <p>Live stream is idle. Configure RTSP or select webcam and click "Start Live Surveillance".</p>
+                      <VideoOff size={36} style={{ color: "var(--text-muted)", marginBottom: 12 }} />
+                      <p style={{ fontWeight: 600, color: "var(--text-primary)", marginBottom: 4 }}>
+                        Camera Not Connected
+                      </p>
+                      <p style={{ fontSize: 12, color: "var(--text-secondary)", maxWidth: 360, margin: "0 auto" }}>
+                        Configure and test your RTSP stream address or local device on the left. The system requires an authenticated, accessible video source and will not simulate an unverified live feed.
+                      </p>
                     </div>
                   )}
                 </div>
@@ -1609,15 +1737,23 @@ function Results({ session }: { session: Session }) {
             </button>
           </div>
           <div className="video-stage">
-            <video
-              ref={video}
-              controls
-              playsInline
-              preload="metadata"
-              src={`/api/sessions/${session.id}/media/video`}
-              onTimeUpdate={(e) => setTime(e.currentTarget.currentTime)}
-            />
-            {heat && (
+            {session.media_type === "image" || session.file_name.match(/\.(jpg|jpeg|png)$/i) ? (
+              <img
+                src={`/api/sessions/${session.id}/media/video`}
+                alt="Annotated detection review"
+                className="cv-annotated-image"
+              />
+            ) : (
+              <video
+                ref={video}
+                controls
+                playsInline
+                preload="metadata"
+                src={`/api/sessions/${session.id}/media/video`}
+                onTimeUpdate={(e) => setTime(e.currentTarget.currentTime)}
+              />
+            )}
+            {heat && r.heatmap?.grid && (
               <svg
                 viewBox="0 0 64 36"
                 preserveAspectRatio="none"

@@ -1,6 +1,6 @@
 # CrowdVision Campus — occupancy and flow review
 
-**New primary workspace:** a React/FastAPI campus operations dashboard with Overview, Analyze footage, Sessions and Model evaluation. It adds up to five named counting zones, a detection-frequency heatmap, synchronized video/event review and protected exports. See [web setup and Render deployment](docs/WEB_WORKSPACE.md). The Streamlit instructions below remain for the preserved legacy app, image analysis and experimental flow tracking.
+**Primary workspace:** a modern, full-width React/FastAPI campus operations platform featuring four unified sections: **Review Footage** (with inline Footage Settings for default capacity, buildup duration, sampling FPS, confidence threshold, and output resolution), **Live Monitoring** (with verified backend RTSP/camera stream testing and honest connection state), **Activity & History** (complete session inventory, search, and filtering), and **Reports** (centralized PDF inspection certificates, telemetry CSVs, and annotated media exports). It supports up to five named counting zones, a detection-frequency heatmap, synchronized video and single-image review, streaming chunk uploads without arbitrary 200 MB restrictions, and deployment-aware processing (local machine or application server). See [web setup and Render deployment](docs/WEB_WORKSPACE.md). The Streamlit instructions below remain for the preserved legacy app and experimental flow tracking.
 
 Help a campus event team review recorded entrances and gathering areas: draw the area being monitored, set its capacity, identify sustained exceedances, and jump to the relevant moments. The project combines head detection with sampled occupancy, experimental directional crossings, compact H.264 evidence and timestamped reports. It is an academic prototype; it does not predict stampedes or establish that a venue is safe.
 
@@ -37,7 +37,7 @@ The included default model is `models/head_detector.pt`, a single-class YOLO11m 
 
 ## Workflow
 
-1. Upload JPG/PNG/BMP or MP4/AVI/MOV/MKV, up to 200 MB.
+1. Upload MP4/MOV/AVI/MKV recording or JPG/PNG image (up to 4K resolution, 240 FPS and 10 minutes), validated dynamically against server disk capacity and configurable storage quotas.
 2. Draw 3–12 corners around a convex counting area and click **Apply area & line**. Set the location, capacity of this area and required exceedance duration. Only detected head centres inside the area count.
 3. Choose video sampling rate (1–15 FPS) and maximum output width (640/960/1280). Defaults are 5 FPS and 960 pixels wide. Inference runs on CPU and may take substantially longer than clip duration.
 4. Optionally draw a two-point flow line and enable directional estimates (at least 5 samples/second). The orange arrow identifies the positive direction. Short-lived tracking IDs are not unique visitors.

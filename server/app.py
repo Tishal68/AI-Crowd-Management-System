@@ -341,7 +341,8 @@ def start(key: str, body: Settings):
         settings = body.model_dump()
         settings.update(weights_path=config.BEST_WEIGHTS_PATH, max_capacity=sum(z['capacity'] for z in spatial.zones), roi_polygon=None, flow_line=None, max_width=body.max_width, smooth_playback=body.smooth_playback)
         meta = read(path/'metadata.json')
-        atomic_json(path/'job.json', dict(settings=settings, source_path=str(path/meta['source']), file_name=meta['file_name'], media_type='video'))
+        media_type = meta.get('media_type', 'image' if Path(meta.get('source', '')).suffix.lower() in ('.jpg', '.jpeg', '.png') else 'video')
+        atomic_json(path/'job.json', dict(settings=settings, source_path=str(path/meta['source']), file_name=meta['file_name'], media_type=media_type))
         (path/'cancel').unlink(missing_ok=True)
         atomic_json(path/'status.json', dict(state='queued', progress=0, updated=time.time(), message='Waiting for detector'))
         pool.submit(execute, path)
@@ -385,7 +386,12 @@ def delete(key: str):
 @app.get('/api/sessions/{key}/media/{kind}')
 def media(key: str, kind: str):
     path = directory(key)
-    names = {'poster': 'poster.jpg', 'preview': 'preview.jpg', 'video': 'annotated.mp4'}
+    names = {'poster': 'poster.jpg', 'preview': 'preview.jpg', 'video': 'annotated.mp4', 'image': 'annotated.jpg', 'annotated': 'annotated.mp4'}
+    if kind in ('video', 'annotated'):
+        if (path/'annotated.mp4').is_file():
+            return FileResponse(path/'annotated.mp4')
+        if (path/'annotated.jpg').is_file():
+            return FileResponse(path/'annotated.jpg')
     if kind not in names or not (path/names[kind]).is_file():
         raise HTTPException(404, 'Media is not ready.')
     return FileResponse(path/names[kind])
@@ -411,7 +417,11 @@ def export(key: str, kind: str):
     if kind == 'json':
         return JSONResponse(session(key)['result'], headers=headers)
     if kind == 'mp4':
-        return FileResponse(path/'annotated.mp4', filename=f'campus-{key[:8]}.mp4')
+        if (path/'annotated.mp4').is_file():
+            return FileResponse(path/'annotated.mp4', filename=f'campus-{key[:8]}.mp4')
+        if (path/'annotated.jpg').is_file():
+            return FileResponse(path/'annotated.jpg', filename=f'campus-{key[:8]}.jpg')
+        raise HTTPException(404, 'Annotated media is not ready.')
     if kind == 'pdf':
         with FileLock(str(path/'.report.lock'), timeout=5):
             if not (path/'report.pdf').exists():
@@ -435,6 +445,72 @@ def export(key: str, kind: str):
 @app.get('/api/evaluation')
 def evaluation():
     return read(Path(config.PROJECT_ROOT)/'docs/model_evaluation.json')
+
+
+@app.get('/api/system/status')
+def system_status(request: Request):
+    weights_path = Path(config.BEST_WEIGHTS_PATH)
+    weights_exist = weights_path.is_file()
+    is_render = bool(os.getenv('RENDER') or os.getenv('RENDER_SERVICE_ID'))
+    is_prod = os.getenv('CROWD_ENV') == 'production'
+    client_host = request.client.host if request.client else ''
+    is_loopback = client_host in ('127.0.0.1', '::1', 'localhost', 'testclient')
+    deployment_mode = 'hosted' if (is_render or (is_prod and not is_loopback)) else 'local'
+    try:
+        usage = shutil.disk_usage(ROOT)
+        free_bytes = usage.free
+        total_bytes = usage.total
+    except Exception:
+        free_bytes = 0
+        total_bytes = 0
+    return {
+        'detector_ready': weights_exist,
+        'model_name': 'YOLO11m Head Detector' if weights_exist else 'Detector Checkpoint Missing',
+        'weights_file': weights_path.name if weights_exist else None,
+        'deployment_mode': deployment_mode,
+        'max_upload_bytes': MAX_UPLOAD,
+        'free_storage_bytes': free_bytes,
+        'total_storage_bytes': total_bytes,
+        'retention_days': int(os.getenv('CROWD_RETENTION_DAYS', '7')),
+        'active_jobs': sum(1 for p in (ROOT/'sessions').glob('*/*/status.json') if read(p).get('state') in ACTIVE)
+    }
+
+
+class CameraCheck(BaseModel):
+    source: str = Field(default='', max_length=512)
+
+
+@app.post('/api/camera/check')
+def check_camera(body: CameraCheck):
+    source_str = body.source.strip()
+    if not source_str:
+        return {'connected': False, 'message': 'No stream address provided. Enter an RTSP address or camera index.'}
+    from src.utils.privacy import redact_sensitive
+    from src.core.stream_reader import is_stream_url, normalize_stream_source, configure_stream_backend
+    safe_source = redact_sensitive(source_str)
+    if not is_stream_url(source_str):
+        return {'connected': False, 'message': f'Unsupported stream address format: {safe_source}. Use RTSP (rtsp://), HTTP, or camera index.'}
+    try:
+        configure_stream_backend()
+        src = normalize_stream_source(source_str)
+        cap = cv2.VideoCapture(src, cv2.CAP_FFMPEG if isinstance(src, str) else cv2.CAP_ANY)
+        if not cap.isOpened():
+            cap.release()
+            cap = cv2.VideoCapture(src)
+        if not cap.isOpened():
+            return {'connected': False, 'message': f'Cannot connect to stream at {safe_source}. Camera is offline or unreachable.'}
+        try:
+            cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+            ok, frame = cap.read()
+            if not ok or frame is None:
+                return {'connected': False, 'message': f'Stream opened at {safe_source} but delivered no readable frames.'}
+            h, w = frame.shape[:2]
+            fps = float(cap.get(cv2.CAP_PROP_FPS) or 25.0)
+            return {'connected': True, 'width': w, 'height': h, 'fps': round(fps, 1), 'message': f'Connected to {safe_source} ({w}×{h} @ {fps:.1f} FPS).'}
+        finally:
+            cap.release()
+    except Exception as exc:
+        return {'connected': False, 'message': f'Connection test failed: {str(exc)}'}
 
 
 build = Path(config.PROJECT_ROOT)/'frontend/dist'
