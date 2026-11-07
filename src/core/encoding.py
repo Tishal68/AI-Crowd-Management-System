@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import tempfile
 from typing import Optional
+from src.services.storage import safe_replace
 
 
 def ffmpeg_executable() -> str:
@@ -90,7 +91,7 @@ class CompactVideoWriter:
                     raise RuntimeError('Video output exceeded its size budget. Choose a lower resolution or shorter clip.')
                 if not self.partial.exists():
                     raise RuntimeError('Video compression failed: encoder produced no output.')
-                os.replace(self.partial, self.path)
+                safe_replace(self.partial, self.path)
         finally:
             self.log.close()
             self.partial.unlink(missing_ok=True)

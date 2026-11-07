@@ -36,10 +36,18 @@ upload_lock = asyncio.Lock()
 
 
 def read(path, fallback=None):
-    try:
-        return json.loads(path.read_text(encoding='utf-8'))
-    except (OSError, ValueError):
+    target = Path(path)
+    if not target.is_file():
         return fallback if fallback is not None else {}
+    for attempt in range(5):
+        try:
+            return json.loads(target.read_text(encoding='utf-8'))
+        except (OSError, ValueError):
+            if attempt < 4:
+                time.sleep(0.01)
+                continue
+            return fallback if fallback is not None else {}
+    return fallback if fallback is not None else {}
 
 
 def directory(key):

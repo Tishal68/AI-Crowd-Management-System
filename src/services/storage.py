@@ -4,7 +4,44 @@ import json
 import os
 import shutil
 import tempfile
+import time
+from typing import Union
 from src.utils.privacy import redact_sensitive
+
+
+def safe_replace(src: Union[str, Path], dst: Union[str, Path], max_attempts: int = 20, base_delay: float = 0.02):
+    """
+    Safely replace dst with src on both Windows and POSIX platforms.
+    
+    On Windows (NTFS), concurrent readers (such as FastAPI status polling endpoints,
+    Windows Defender, or file indexers) hold shared read locks. While open, os.replace()
+    fails with:
+      PermissionError: [WinError 5] Access is denied
+      or OSError: [WinError 32] The process cannot access the file because it is being used
+    
+    This function retries with exponential backoff so readers can complete and close their handles.
+    If atomic replacement persistently fails after retries, it copies content directly as a fallback
+    to guarantee the background analysis pipeline does not crash.
+    """
+    src_path = Path(src)
+    dst_path = Path(dst)
+    for attempt in range(max_attempts):
+        try:
+            os.replace(src_path, dst_path)
+            return
+        except (PermissionError, OSError) as exc:
+            winerr = getattr(exc, 'winerror', None)
+            errno = getattr(exc, 'errno', None)
+            if (winerr in (5, 32) or errno in (13, 16)) and attempt < max_attempts - 1:
+                time.sleep(base_delay * (1.15 ** attempt))
+                continue
+            elif attempt == max_attempts - 1:
+                try:
+                    shutil.copyfile(str(src_path), str(dst_path))
+                    return
+                except Exception:
+                    raise exc
+            raise
 
 
 def atomic_json(path, value):
@@ -14,7 +51,8 @@ def atomic_json(path, value):
     try:
         with os.fdopen(fd, 'w', encoding='utf-8') as f:
             json.dump(redact_sensitive(value), f, indent=2, allow_nan=False)
-        os.replace(name, path)
+            f.flush()
+        safe_replace(name, path)
     finally:
         Path(name).unlink(missing_ok=True)
 

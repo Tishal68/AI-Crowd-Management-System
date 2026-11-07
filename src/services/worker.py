@@ -11,7 +11,7 @@ from filelock import FileLock
 import config
 from src.core.detector import load_model, run_detection
 from src.core.video_processor import process_video, AnalysisCancelled
-from src.services.storage import atomic_json, check_storage_budget
+from src.services.storage import atomic_json, check_storage_budget, safe_replace
 from src.utils.helpers import get_crowd_level
 
 
@@ -21,15 +21,26 @@ def run(run_dir, preloaded_model=None):
     settings=job['settings']; start=time.perf_counter(); last=[0.]
     torch.set_num_threads(2)
     def status(state, **values):
-        atomic_json(run_dir/'status.json',dict(state=state,updated=time.time(),**values))
+        try:
+            atomic_json(run_dir/'status.json', dict(state=state, updated=time.time(), **values))
+        except Exception:
+            if state in ('complete', 'failed', 'cancelled'):
+                try:
+                    time.sleep(0.1)
+                    atomic_json(run_dir/'status.json', dict(state=state, updated=time.time(), **values))
+                except Exception:
+                    pass
     def cancelled(): return (run_dir/'cancel').exists()
     def progress(index,total,frame,count,level,auto):
         now=time.perf_counter()
         if now-last[0]>.8:
             last[0]=now
-            thumb=cv2.resize(frame,(640,max(2,int(frame.shape[0]*640/frame.shape[1]))))
-            cv2.imwrite(str(run_dir/'preview.tmp.jpg'),thumb,[cv2.IMWRITE_JPEG_QUALITY,70])
-            (run_dir/'preview.tmp.jpg').replace(run_dir/'preview.jpg')
+            try:
+                thumb=cv2.resize(frame,(640,max(2,int(frame.shape[0]*640/frame.shape[1]))))
+                cv2.imwrite(str(run_dir/'preview.tmp.jpg'),thumb,[cv2.IMWRITE_JPEG_QUALITY,70])
+                safe_replace(run_dir/'preview.tmp.jpg', run_dir/'preview.jpg')
+            except Exception:
+                pass
             status('running',progress=min(index/total,.99) if total else 0.,
                    message=f'Frame {index:,} / {total:,} | {count} heads in area',elapsed_seconds=now-start)
     try:

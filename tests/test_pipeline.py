@@ -175,5 +175,16 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(clear_legacy_exports(self.root,['streamlit_videos']),4)
         self.assertTrue(outside.exists())
 
+    def test_atomic_json_survives_concurrent_file_reader(self):
+        target = self.root / 'status.json'
+        atomic_json(target, {'state': 'initial', 'progress': 0.0})
+        # Simulate concurrent reader holding an open read handle on Windows
+        with open(target, 'r', encoding='utf-8') as reader:
+            atomic_json(target, {'state': 'running', 'progress': 0.5})
+        import json
+        data = json.loads(target.read_text(encoding='utf-8'))
+        self.assertEqual(data['state'], 'running')
+        self.assertEqual(data['progress'], 0.5)
+
 if __name__=='__main__':
     unittest.main()

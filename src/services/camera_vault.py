@@ -26,6 +26,7 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 import config
 from src.utils.privacy import redact_sensitive
+from src.services.storage import safe_replace
 
 _VAULT_KEY_FILE = Path(config.OUTPUTS_ROOT) / '.camera_vault.key'
 _REGISTRY_FILE = Path(config.OUTPUTS_ROOT) / 'cameras.json'
@@ -110,7 +111,7 @@ def _write_secure_raw_key(path: Path, key: bytes):
     with os.fdopen(fd, 'wb') as f:
         f.write(b'RAW:' + key)
     _enforce_secure_file_permissions(temp_key)
-    temp_key.replace(path)
+    safe_replace(temp_key, path)
     _enforce_secure_file_permissions(path)
 
 
@@ -398,7 +399,7 @@ def save_camera_registry(cameras: List[Dict[str, Any]], registry_path: Optional[
 
     temp_path = path.with_suffix('.tmp')
     temp_path.write_text(json.dumps(sanitized, indent=2), encoding='utf-8')
-    temp_path.replace(path)
+    safe_replace(temp_path, path)
 
 
 def resolve_camera_connection_uri(cam_or_uri: Union[Dict[str, Any], str, int]) -> Union[str, int]:
