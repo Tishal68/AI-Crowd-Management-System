@@ -124,9 +124,9 @@ Training outputs go under `runs/train/`. Evaluate and choose a trained checkpoin
 ## Structure
 
 ```text
-frontend/                   primary React/TypeScript workspace
-server/app.py               authenticated API and single-worker orchestration
-app.py                       preserved local Streamlit interface
+app.py                       primary Streamlit application entry point
+frontend/                   optional React/TypeScript web interface
+server/app.py               optional authenticated API and single-worker orchestration
 config.py                    paths and detector/training defaults
 src/core/detector.py         image/frame inference
 src/core/video_processor.py  sampling, counts and source timestamps

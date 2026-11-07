@@ -1,3 +1,4 @@
+import os
 """
 CrowdVision AI — Campus Crowd Intelligence & Monitoring Platform.
 Enterprise-grade Streamlit application designed for dark-navy operations monitoring.
@@ -564,6 +565,32 @@ def reset_session():
     st.session_state.session_id = uuid.uuid4().hex
     st.session_state.upload_generation += 1
 
+
+CAMERA_REGISTRY_FILE = OUTPUTS / 'cameras.json'
+
+def load_camera_registry():
+    if CAMERA_REGISTRY_FILE.is_file():
+        try:
+            return json.loads(CAMERA_REGISTRY_FILE.read_text(encoding='utf-8'))
+        except Exception:
+            pass
+    return []
+
+def save_camera_registry(cams):
+    CAMERA_REGISTRY_FILE.parent.mkdir(parents=True, exist_ok=True)
+    CAMERA_REGISTRY_FILE.write_text(json.dumps(cams, indent=2), encoding='utf-8')
+
+def test_camera_connection(source_uri):
+    from src.core.stream_reader import StreamCapture
+    try:
+        cap = StreamCapture(source_uri, target_fps=5)
+        ok, frame, _ = cap.read(timeout=2.5)
+        w, h, fps = cap.width, cap.height, int(cap.fps)
+        cap.release()
+        return ok and frame is not None, w, h, fps
+    except Exception:
+        return False, 0, 0, 0
+
 def render_page_header(title, subtitle=""):
     sub_html = f'<div class="cv-page-sub">{subtitle}</div>' if subtitle else ''
     st.markdown(f'''
@@ -621,7 +648,7 @@ st.title('Crowd occupancy & flow review')
 # ---------------------------------------------------------
 def render_top_navigation():
     # 1. Primary Top Header Bar
-    c_brand, c_primary, c_status = st.columns([1.6, 2.0, 1.0], vertical_alignment="center")
+    c_brand, c_controls = st.columns([2.2, 1.8], vertical_alignment="center")
 
     with c_brand:
         st.markdown('''
@@ -629,62 +656,80 @@ def render_top_navigation():
           <div class="cv-top-brand-icon">👥</div>
           <div>
             <div class="cv-top-brand-title">CrowdVision</div>
-            <div class="cv-top-brand-subtitle">Campus Crowd Analytics</div>
+            <div class="cv-top-brand-subtitle">Campus Crowd Intelligence</div>
           </div>
         </div>
         ''', unsafe_allow_html=True)
 
-    curr_p = st.session_state.get('primary_nav', 'Operations')
+    with c_controls:
+        c_status, c_popover = st.columns([1.4, 1.0], vertical_alignment="center")
+        with c_status:
+            # Honest system readiness check
+            weights_ok = Path(config.BEST_WEIGHTS_PATH).is_file()
+            status_text = "System Operational" if weights_ok else "Model Missing"
+            status_color = "#3D9970" if weights_ok else "#C65D62"
+            st.markdown(f'''
+            <div style="display:flex;justify-content:flex-end;">
+              <div class="cv-top-status-badge">
+                <span class="cv-status-dot" style="background:{status_color};box-shadow:0 0 8px {status_color};"></span>
+                <span>{status_text}</span>
+              </div>
+            </div>
+            ''', unsafe_allow_html=True)
 
-    with c_primary:
-        p_c1, p_c2 = st.columns(2)
-        with p_c1:
-            is_ops = (curr_p == 'Operations')
-            if st.button('⊞  Operations', key='btn_nav_primary_ops', type='primary' if is_ops else 'secondary', width='stretch'):
-                if curr_p != 'Operations':
-                    st.session_state['primary_nav'] = 'Operations'
-                    st.session_state['secondary_nav'] = 'Review Footage'
+        with c_popover:
+            with st.popover("⚙ Settings", use_container_width=True):
+                st.markdown("#### System & Pipeline Settings")
+                st.caption("Global parameters applied across video and image analysis.")
+                
+                # Model information
+                model_p = Path(config.BEST_WEIGHTS_PATH)
+                st.text_input("Detector Model (.pt)", str(model_p.name), disabled=True,
+                              help=f"Path: {config.BEST_WEIGHTS_PATH}")
+                
+                # Configurable detection confidence
+                c_conf = st.slider("Default Confidence", 0.1, 0.9,
+                                   float(st.session_state.get('setting_conf', config.INFERENCE_CONF_THRESHOLD)),
+                                   0.05, key='pop_setting_conf')
+                st.session_state['setting_conf'] = c_conf
+
+                # Configurable inference detail (imgsz)
+                c_imgsz = st.select_slider("Detection Detail (imgsz)", [416, 640, 768, 960],
+                                           value=int(st.session_state.get('setting_imgsz', config.INFERENCE_IMGSZ)),
+                                           key='pop_setting_imgsz')
+                st.session_state['setting_imgsz'] = c_imgsz
+
+                # Hardware Provider (measured dynamically)
+                import torch
+                has_cuda = torch.cuda.is_available()
+                dev_label = f"CUDA GPU: {torch.cuda.get_device_name(0)}" if has_cuda else "Direct PyTorch (CPU Host)"
+                st.text_input("Execution Provider", dev_label, disabled=True)
+
+                # Storage Budget
+                limit_bytes = int(os.environ.get('CROWD_STORAGE_LIMIT_BYTES', 100 * 1024**3))
+                limit_gb = limit_bytes / (1024**3)
+                used_bytes = storage_bytes(OUTPUTS)
+                st.caption(f"Session Storage: {mb(used_bytes)} used · Quota: {limit_gb:.0f} GB")
+
+                st.markdown("---")
+                if st.button("Clear Current Session", key="pop_clear_session_btn", width="stretch"):
+                    reset_session()
                     st.rerun()
-        with p_c2:
-            is_mod = (curr_p == 'Model & System')
-            if st.button('⚙  Model & System', key='btn_nav_primary_mod', type='primary' if is_mod else 'secondary', width='stretch'):
-                if curr_p != 'Model & System':
-                    st.session_state['primary_nav'] = 'Model & System'
-                    st.session_state['secondary_nav'] = 'Model Lab'
-                    st.rerun()
 
-    with c_status:
-        st.markdown('''
-        <div style="display:flex;justify-content:flex-end;">
-          <div class="cv-top-status-badge">
-            <span class="cv-status-dot"></span>
-            <span>System Ready</span>
-          </div>
-        </div>
-        ''', unsafe_allow_html=True)
-
-    # 2. Horizontal Secondary Navigation Bar
+    # 2. Horizontal Operations Navigation Bar (Clean 4 Sections)
     curr_s = st.session_state.get('secondary_nav', 'Review Footage')
-    if curr_p == 'Operations':
-        sec_items = [
-            ('▷  Review Footage', 'Review Footage'),
-            ('📹  Live Monitoring', 'Live Monitoring'),
-            ('⊞  Activity & History', 'Activity & History'),
-            ('📄  Reports', 'Reports'),
-        ]
-    else:
-        sec_items = [
-            ('⚙  Model Lab', 'Model Lab'),
-            ('📹  Camera Setup', 'Camera Setup'),
-            ('⚙  Settings', 'Settings'),
-            ('🩺  System Health', 'System Health'),
-        ]
+    sec_items = [
+        ('▷  Review Footage', 'Review Footage'),
+        ('📹  Live Monitoring', 'Live Monitoring'),
+        ('⊞  Activity & History', 'Activity & History'),
+        ('📄  Reports', 'Reports'),
+    ]
 
     s_cols = st.columns(len(sec_items))
     for i, (label, val) in enumerate(sec_items):
         with s_cols[i]:
             is_active = (curr_s == val)
-            if st.button(label, key=f'btn_sec_{curr_p}_{val}', type='primary' if is_active else 'secondary', width='stretch'):
+            if st.button(label, key=f'btn_sec_{val}', type='primary' if is_active else 'secondary', width='stretch'):
                 st.session_state['secondary_nav'] = val
                 st.rerun()
 
@@ -743,25 +788,101 @@ if page == 'Model Lab':
 if page == 'Camera Setup':
     render_page_header('Camera Setup & Multi-Zone Feeds', 'Manage campus camera registry, resolution profiles, and spatial zone mappings.')
     st.subheader('Registered Camera Feeds')
-    cam_data = [
-        {'Camera ID': 'CAM-01', 'Location': 'Campus Entrance / Concourse', 'Protocol': 'RTSP / H.264', 'Resolution': '1920×1080', 'FPS': 30, 'Status': '🟢 Active'},
-        {'Camera ID': 'CAM-02', 'Location': 'Central Plaza South', 'Protocol': 'RTSP / H.264', 'Resolution': '1920×1080', 'FPS': 25, 'Status': '🟢 Active'},
-        {'Camera ID': 'CAM-03', 'Location': 'Library Atrium', 'Protocol': 'RTSP / H.264', 'Resolution': '1280×720', 'FPS': 20, 'Status': '🟢 Active'},
-        {'Camera ID': 'CAM-04', 'Location': 'Academic Block B Corridor', 'Protocol': 'RTSP / H.264', 'Resolution': '1280×720', 'FPS': 15, 'Status': '🟡 Idle'},
-        {'Camera ID': 'CAM-05', 'Location': 'Auditorium North Gate', 'Protocol': 'RTSP / H.264', 'Resolution': '1920×1080', 'FPS': 30, 'Status': '⚪ Standby'},
-    ]
-    st.dataframe(pd.DataFrame(cam_data), hide_index=True, width='stretch')
 
-    with st.expander('➕ Register New Surveillance Camera / Stream', expanded=False):
+    saved_cams = load_camera_registry()
+    if saved_cams:
+        cam_display = []
+        for c in saved_cams:
+            cam_display.append({
+                'Camera ID': c.get('id', 'CAM'),
+                'Name': c.get('name', 'Camera'),
+                'Location / Zone': c.get('zone', 'Zone'),
+                'Source URI': c.get('uri', ''),
+                'Resolution': c.get('resolution', 'Unknown'),
+                'Capacity': c.get('capacity', 80),
+                'Status': '🟢 Verified Online' if c.get('verified') else '⚪ Configured / Unverified'
+            })
+        st.dataframe(pd.DataFrame(cam_display), hide_index=True, width='stretch')
+
+        # Option to remove a camera
+        c_del1, c_del2 = st.columns([3, 1])
+        with c_del1:
+            cam_to_remove = st.selectbox("Select camera to remove", [c.get('name') for c in saved_cams], key="sel_cam_rm")
+        with c_del2:
+            if st.button("Delete Camera", key="btn_del_cam", width="stretch"):
+                saved_cams = [c for c in saved_cams if c.get('name') != cam_to_remove]
+                save_camera_registry(saved_cams)
+                st.success(f"Removed {cam_to_remove} from registry.")
+                st.rerun()
+    else:
+        st.info("No physical surveillance cameras configured yet. Add your cameras below to enable multi-camera monitoring.")
+        with st.expander("Reference Architecture Templates (Template Preview — Not Connected)", expanded=False):
+            template_cams = [
+                {'Camera ID': 'REF-01', 'Location': 'Campus Entrance / Concourse', 'Protocol': 'RTSP / H.264', 'Resolution': '1920×1080', 'FPS': 30, 'Status': 'Template (Not Connected)'},
+                {'Camera ID': 'REF-02', 'Location': 'Central Plaza South', 'Protocol': 'RTSP / H.264', 'Resolution': '1920×1080', 'FPS': 25, 'Status': 'Template (Not Connected)'},
+                {'Camera ID': 'REF-03', 'Location': 'Library Atrium', 'Protocol': 'RTSP / H.264', 'Resolution': '1280×720', 'FPS': 20, 'Status': 'Template (Not Connected)'},
+            ]
+            st.dataframe(pd.DataFrame(template_cams), hide_index=True, width='stretch')
+
+    with st.expander('➕ Register New Surveillance Camera / Stream', expanded=not bool(saved_cams)):
         c1, c2 = st.columns(2)
         with c1:
-            st.text_input('Camera Name / Label', placeholder='e.g. Science Complex East')
-            st.text_input('RTSP Stream URI', placeholder='rtsp://admin:pass@192.168.1.120:554/stream1')
+            cam_name = st.text_input('Camera Name / Label', placeholder='e.g. Science Complex East', key='new_cam_name')
+            cam_uri = st.text_input('Stream Source (RTSP URL or Webcam Index)', placeholder='rtsp://admin:pass@192.168.1.120:554/stream1 or 0', key='new_cam_uri')
         with c2:
-            st.selectbox('Assigned Spatial Zone', ['Campus entrance', 'Main auditorium', 'Library', 'Academic block', 'Cafeteria'])
-            st.number_input('Target Zone Capacity', 10, 5000, 100)
-        if st.button('Test Connection & Register Feed'):
-            st.success('Stream parameters verified and registered into local cache.')
+            cam_zone = st.selectbox('Assigned Spatial Zone', ['Campus entrance', 'Main auditorium', 'Library', 'Academic block', 'Cafeteria', 'Quad / Plaza'], key='new_cam_zone')
+            cam_cap = st.number_input('Target Zone Capacity', 10, 5000, 100, key='new_cam_cap')
+
+        c_act1, c_act2 = st.columns([1.5, 1])
+        with c_act1:
+            test_and_save = st.button('Test Connection & Register Feed', type='primary', key='btn_test_cam')
+        with c_act2:
+            save_offline = st.button('Save as Offline Template', key='btn_save_offline')
+
+        if test_and_save:
+            clean_uri = cam_uri.strip()
+            clean_name = cam_name.strip() or f"Camera {len(saved_cams)+1}"
+            if not clean_uri:
+                st.error("Please enter a valid RTSP stream URL or webcam device index (e.g., 0).")
+            else:
+                with st.spinner("Testing connection to stream..."):
+                    is_ok, w, h, fps = test_camera_connection(clean_uri)
+                if is_ok:
+                    new_cam = {
+                        'id': f"CAM-{len(saved_cams)+1:02d}",
+                        'name': clean_name,
+                        'uri': clean_uri,
+                        'zone': cam_zone,
+                        'capacity': int(cam_cap),
+                        'resolution': f"{w}×{h} @ {fps} FPS",
+                        'verified': True,
+                    }
+                    saved_cams.append(new_cam)
+                    save_camera_registry(saved_cams)
+                    st.success(f"Stream verified ({w}×{h} @ {fps} FPS) and registered into local camera registry.")
+                    st.rerun()
+                else:
+                    st.error(f"Could not connect to {clean_uri}. Camera may be offline, firewalled, or credentials invalid. You can use 'Save as Offline Template' to store without active verification.")
+
+        if save_offline:
+            clean_uri = cam_uri.strip()
+            clean_name = cam_name.strip() or f"Camera {len(saved_cams)+1}"
+            if not clean_uri:
+                st.error("Please enter a stream URI or device index.")
+            else:
+                new_cam = {
+                    'id': f"CAM-{len(saved_cams)+1:02d}",
+                    'name': clean_name,
+                    'uri': clean_uri,
+                    'zone': cam_zone,
+                    'capacity': int(cam_cap),
+                    'resolution': "Unverified",
+                    'verified': False,
+                }
+                saved_cams.append(new_cam)
+                save_camera_registry(saved_cams)
+                st.info(f"Registered {clean_name} as unverified template.")
+                st.rerun()
     st.stop()
 
 
@@ -774,17 +895,28 @@ if page == 'Settings':
     s1, s2 = st.columns(2)
     with s1:
         st.markdown('**Inference & Detection Parameters**')
-        st.text_input('Model weights (.pt)', config.BEST_WEIGHTS_PATH, disabled=True)
-        st.slider('Default Confidence Threshold', 0.1, 0.9, 0.35, 0.05)
-        st.select_slider('Default Input Resolution (imgsz)', [416, 640, 768, 960], value=640)
-        st.checkbox('Enable EMA Box Smoothing on Video Export', value=True)
+        weights_path = Path(config.BEST_WEIGHTS_PATH)
+        weights_exist = weights_path.is_file()
+        weights_info = f"{weights_path.name} ({mb(weights_path.stat().st_size)})" if weights_exist else f"{weights_path.name} (Not found)"
+        st.text_input('Model weights (.pt)', weights_info, disabled=True)
+        conf_val = st.slider('Default Confidence Threshold', 0.1, 0.9, float(st.session_state.get('setting_conf', config.INFERENCE_CONF_THRESHOLD)), 0.05, key='settings_conf_slider')
+        st.session_state['setting_conf'] = conf_val
+        imgsz_val = st.select_slider('Default Input Resolution (imgsz)', [416, 640, 768, 960], value=int(st.session_state.get('setting_imgsz', config.INFERENCE_IMGSZ)), key='settings_imgsz_slider')
+        st.session_state['setting_imgsz'] = imgsz_val
+        st.checkbox('Enable EMA Box Smoothing on Video Export', value=True, key='settings_ema_box')
     with s2:
-        st.markdown('**Video Export & Acceleration**')
-        st.selectbox('Video Export Encoding', ['H.264 (CRF 21, Fast Preset)', 'H.264 (CRF 23, Balanced)'])
-        st.selectbox('Default Hardware Execution Provider', ['Local CUDA GPU (NVIDIA)', 'CPU Fallback'])
+        st.markdown('**Hardware & Acceleration**')
+        import torch
+        has_cuda = torch.cuda.is_available()
+        cuda_name = torch.cuda.get_device_name(0) if has_cuda else "None (CPU Execution)"
+        st.text_input('PyTorch Version', torch.__version__, disabled=True)
+        st.text_input('Detected Hardware Acceleration', cuda_name, disabled=True)
+        st.selectbox('Execution Provider Selection', ['Local CUDA GPU (NVIDIA)' if has_cuda else 'Direct CPU Host', 'CPU Fallback'], key='settings_exec_provider')
 
         st.markdown('**Session & Local Cache Management**')
-        st.caption('Reset current session, clear temporary buffers, and allocate a fresh session ID.')
+        used_bytes = storage_bytes(OUTPUTS)
+        limit_bytes = int(os.environ.get('CROWD_STORAGE_LIMIT_BYTES', 100 * 1024**3))
+        st.caption(f'Storage Usage: {mb(used_bytes)} / {limit_bytes / (1024**3):.0f} GB allocated. Reset session to clear temporary video buffers.')
         if st.button('Clear this session', key='settings_clear_session_btn', width='stretch'):
             reset_session()
             st.rerun()
@@ -796,22 +928,32 @@ if page == 'Settings':
 # ---------------------------------------------------------
 if page == 'System Health':
     render_page_header('System Health & Diagnostics', 'Real-time detector telemetry, GPU/CPU hardware metrics, and disk storage budget.')
+    import torch
+    weights_path = Path(config.BEST_WEIGHTS_PATH)
+    weights_ok = weights_path.is_file()
+    has_cuda = torch.cuda.is_available()
+    used_bytes = storage_bytes(OUTPUTS)
+    limit_bytes = int(os.environ.get('CROWD_STORAGE_LIMIT_BYTES', 100 * 1024**3))
+    limit_gb = limit_bytes / (1024**3)
+
     h1, h2, h3, h4 = st.columns(4)
     with h1:
-        st.markdown('''<div class="kpi-card"><div class="kpi-header"><span class="kpi-icon" style="color:#3D9970;">🧠</span><span class="kpi-title">Inference Engine</span></div><div class="kpi-value" style="font-size:18px;">YOLO11m</div><div class="kpi-badge badge-emerald">Model Loaded</div></div>''', unsafe_allow_html=True)
+        st.markdown(f'''<div class="kpi-card"><div class="kpi-header"><span class="kpi-icon" style="color:#3D9970;">🧠</span><span class="kpi-title">Inference Engine</span></div><div class="kpi-value" style="font-size:18px;">YOLO11m</div><div class="kpi-badge {'badge-emerald' if weights_ok else 'badge-red'}">{'Weights Ready' if weights_ok else 'Weights Missing'}</div></div>''', unsafe_allow_html=True)
     with h2:
-        st.markdown('''<div class="kpi-card"><div class="kpi-header"><span class="kpi-icon" style="color:#B87345;">⚡</span><span class="kpi-title">Hardware Provider</span></div><div class="kpi-value" style="font-size:18px;">Direct PyTorch</div><div class="kpi-badge badge-cyan">Sub-30ms Latency</div></div>''', unsafe_allow_html=True)
+        prov_text = "CUDA GPU" if has_cuda else "CPU Host"
+        prov_sub = torch.cuda.get_device_name(0)[:16] if has_cuda else "Host Threaded"
+        st.markdown(f'''<div class="kpi-card"><div class="kpi-header"><span class="kpi-icon" style="color:#B87345;">⚡</span><span class="kpi-title">Hardware Provider</span></div><div class="kpi-value" style="font-size:18px;">{prov_text}</div><div class="kpi-badge badge-amber">{prov_sub}</div></div>''', unsafe_allow_html=True)
     with h3:
-        used_bytes = storage_bytes(SESSIONS)
-        st.markdown(f'''<div class="kpi-card"><div class="kpi-header"><span class="kpi-icon" style="color:#087F5B;">💾</span><span class="kpi-title">Session Storage</span></div><div class="kpi-value" style="font-size:18px;">{mb(used_bytes)}</div><div class="kpi-badge badge-purple">Quota: 50 GB</div></div>''', unsafe_allow_html=True)
+        st.markdown(f'''<div class="kpi-card"><div class="kpi-header"><span class="kpi-icon" style="color:#087F5B;">💾</span><span class="kpi-title">Session Storage</span></div><div class="kpi-value" style="font-size:18px;">{mb(used_bytes)}</div><div class="kpi-badge badge-cyan">Quota: {limit_gb:.0f} GB</div></div>''', unsafe_allow_html=True)
     with h4:
-        st.markdown('''<div class="kpi-card"><div class="kpi-header"><span class="kpi-icon" style="color:#3D9970;">🛡</span><span class="kpi-title">System Status</span></div><div class="kpi-value" style="font-size:18px;">100% Ready</div><div class="kpi-badge badge-emerald">All Pipelines OK</div></div>''', unsafe_allow_html=True)
+        all_ok = weights_ok
+        st.markdown(f'''<div class="kpi-card"><div class="kpi-header"><span class="kpi-icon" style="color:#3D9970;">🛡</span><span class="kpi-title">System Status</span></div><div class="kpi-value" style="font-size:18px;">{'Operational' if all_ok else 'Attention Needed'}</div><div class="kpi-badge {'badge-emerald' if all_ok else 'badge-amber'}">{'Pipelines Verified' if all_ok else 'Model Missing'}</div></div>''', unsafe_allow_html=True)
 
     st.markdown('### Runtime Diagnostic Details')
     diag_df = pd.DataFrame([
-        {'Component': 'Ultralytics YOLO Engine', 'Status': 'Initialized', 'Version': '8.x / 11.x', 'Device': config.INFERENCE_DEVICE},
+        {'Component': 'Ultralytics YOLO Engine', 'Status': 'Ready' if weights_ok else 'Missing Weights', 'Version': 'Ultralytics 8.x/11.x', 'Device': f"{config.INFERENCE_DEVICE} (CUDA={has_cuda})"},
         {'Component': 'OpenCV Threaded Capture', 'Status': 'Healthy', 'Version': cv2.__version__, 'Buffer Policy': 'Drain Most Recent'},
-        {'Component': 'Storage Budget Dispatcher', 'Status': 'Protected', 'Budget Limit': '50 GB', 'Locking': 'FileLock Timeout 10s'},
+        {'Component': 'Storage Budget Dispatcher', 'Status': 'Protected', 'Budget Limit': f'{limit_gb:.0f} GB', 'Locking': 'FileLock Timeout 10s'},
         {'Component': 'ReportLab PDF Generator', 'Status': 'Operational', 'Profile': 'ReportLab 4.x', 'Font Engine': 'Helvetica Core'},
     ])
     st.dataframe(diag_df, hide_index=True, width='stretch')
@@ -825,32 +967,71 @@ if page == 'Live Monitoring':
     render_page_header('Live Monitoring & RTSP Surveillance', 'Connect IP surveillance cameras or local devices for real-time occupancy monitoring.')
     st.subheader('Live RTSP IP camera surveillance center')
     st.markdown('<div style="color:#B6B8AE;margin-bottom:14px;font-size:13.5px;">Connect IP surveillance cameras, NVR streams, or webcams for real-time occupancy counting, capacity alerts, and live recording.</div>', unsafe_allow_html=True)
+
+    saved_cams = load_camera_registry()
+
     c_vid, c_side = st.columns([2.3, 1])
 
     with c_side:
-        st.markdown('### Stream configuration')
-        feed_mode = st.radio('Input source', ['RTSP / Network URL', 'Local webcam'], horizontal=True)
-        if feed_mode == 'Local webcam':
-            cam_idx = st.selectbox('Camera device', [0, 1, 2], format_func=lambda i: f"Camera {i} ({'Default' if i==0 else 'External'})")
-            target_source = str(cam_idx)
-        else:
-            target_source = st.text_input('RTSP stream URL', value='rtsp://', placeholder='rtsp://admin:pass@192.168.1.100:554/live')
+        st.markdown('### Stream Configuration')
+        feed_options = []
+        if saved_cams:
+            feed_options.append('Saved Campus Camera')
+        feed_options.extend(['Local webcam', 'RTSP / Network URL'])
 
-        grab_snapshot = st.button('📷 Grab Camera Frame to Draw Area', width='stretch')
-        flow_live = st.checkbox('Estimate directional tripwire flow', value=st.session_state.get('rtsp_flow', False))
+        feed_mode = st.radio('Input Source', feed_options, horizontal=True, key='live_feed_mode')
+
+        rtsp_loc_default = 'Campus Entrance'
+        rtsp_cap_default = 80
+
+        if feed_mode == 'Saved Campus Camera':
+            cam_labels = [f"{c.get('name', 'Cam')} ({c.get('zone', 'Zone')})" for c in saved_cams]
+            selected_cam_idx = st.selectbox('Select Registered Camera', range(len(saved_cams)), format_func=lambda i: cam_labels[i], key='live_sel_cam')
+            chosen_cam = saved_cams[selected_cam_idx]
+            target_source = chosen_cam.get('uri', '')
+            rtsp_loc_default = chosen_cam.get('zone', 'Campus Entrance')
+            rtsp_cap_default = int(chosen_cam.get('capacity', 80))
+            st.caption(f"Configured URI: `{target_source}` · Resolution: {chosen_cam.get('resolution', 'Dynamic')}")
+        elif feed_mode == 'Local webcam':
+            cam_idx = st.selectbox('Camera Device', [0, 1, 2], format_func=lambda i: f"Camera {i} ({'Default' if i==0 else 'External'})", key='live_cam_idx')
+            target_source = str(cam_idx)
+            rtsp_loc_default = 'Campus Concourse'
+        else:
+            target_source = st.text_input('RTSP Stream URL', value='', placeholder='rtsp://admin:pass@192.168.1.100:554/live', key='live_rtsp_uri')
+            rtsp_loc_default = 'Monitored Zone'
+
+        col_sn1, col_sn2 = st.columns(2)
+        with col_sn1:
+            grab_snapshot = st.button('📷 Grab Frame', width='stretch', key='btn_grab_snap')
+        with col_sn2:
+            test_conn = st.button('🔍 Test Stream', width='stretch', key='btn_test_stream')
+
+        flow_live = st.checkbox('Estimate directional tripwire flow', value=st.session_state.get('rtsp_flow', False), key='live_flow_chk')
         st.session_state.rtsp_flow = flow_live
-        record_live = st.checkbox('Record live stream to MP4', value=False)
-        rtsp_loc = st.text_input('Monitored location', value='Campus entrance')
-        rtsp_cap = st.number_input('Capacity threshold', 1, 10000, 80)
+        record_live = st.checkbox('Record live stream to MP4', value=False, key='live_rec_chk')
+        rtsp_loc = st.text_input('Monitored location', value=rtsp_loc_default, key='live_loc_input')
+        rtsp_cap = st.number_input('Capacity threshold', 1, 10000, rtsp_cap_default, key='live_cap_input')
 
         col_b1, col_b2 = st.columns(2)
-        start_btn = col_b1.button('Start Stream', type='primary', disabled=st.session_state.get('rtsp_active', False), width='stretch')
-        stop_btn = col_b2.button('Stop Stream', disabled=not st.session_state.get('rtsp_active', False), width='stretch')
-        st.caption('Non-blocking threaded capture drains network buffers for sub-30ms latency.')
+        start_btn = col_b1.button('Start Stream', type='primary', disabled=st.session_state.get('rtsp_active', False), width='stretch', key='btn_start_stream')
+        stop_btn = col_b2.button('Stop Stream', disabled=not st.session_state.get('rtsp_active', False), width='stretch', key='btn_stop_stream')
+        st.caption('Drains network buffers for low latency. Camera and resources are released promptly on stop.')
+
+    if test_conn:
+        src_clean = target_source.strip()
+        if not src_clean:
+            st.error("Please enter a stream URL or select webcam first.")
+        else:
+            with st.spinner("Connecting to stream..."):
+                ok_c, w_c, h_c, fps_c = test_camera_connection(src_clean)
+            if ok_c:
+                st.success(f"Stream is reachable! Resolution: {w_c}×{h_c} @ ~{fps_c} FPS.")
+            else:
+                st.error("Cannot connect to stream. Check network address, credentials, or camera status.")
 
     if grab_snapshot:
         source_clean = target_source.strip()
-        if not source_clean or source_clean == 'rtsp://':
+        if not source_clean:
             st.error('Enter a valid RTSP stream URL or select webcam first.')
         else:
             with st.spinner('Grabbing frame from camera...'):
@@ -873,7 +1054,7 @@ if page == 'Live Monitoring':
             with st.expander('Monitored area & flow line editor (Camera Snapshot)', expanded=True):
                 rtsp_geom = scene_editor(st.session_state.rtsp_preview, key='rtsp_scene_editor', geometry=st.session_state.get('rtsp_geometry')) or {'polygon': None, 'line': None}
                 st.session_state.rtsp_geometry = rtsp_geom
-                if st.button('Clear drawn area'):
+                if st.button('Clear drawn area', key='btn_clear_area'):
                     st.session_state.rtsp_geometry = {'polygon': None, 'line': None}
                     st.rerun()
 
@@ -884,6 +1065,16 @@ if page == 'Live Monitoring':
             st.session_state.rtsp_active = True
 
         if st.session_state.get('rtsp_active'):
+            st.markdown(
+                f'''<div style="background:#292E2A;border:1px solid #454B43;padding:10px 14px;border-radius:8px;display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <span style="color:#C65D62;font-weight:700;font-size:13px;animation:pulse 1.5s infinite;">● LIVE SURVEILLANCE</span>
+                        <span style="color:#B6B8AE;font-size:12.5px;">· {rtsp_loc} (Cap: {rtsp_cap})</span>
+                    </div>
+                </div>''',
+                unsafe_allow_html=True
+            )
+
             from src.core.stream_reader import StreamCapture
             from src.core.detector import load_model, detect_heads_in_frame, _model_has_native_head_class
             from src.utils.helpers import draw_detections, draw_overlay, get_crowd_level, resolve_class_ids, BoxSmoother
@@ -891,17 +1082,25 @@ if page == 'Live Monitoring':
             from src.core.encoding import CompactVideoWriter
 
             source_clean = target_source.strip()
-            if not source_clean or source_clean == 'rtsp://':
+            if not source_clean:
                 st.error('Enter a valid RTSP stream URL or select a webcam.')
                 st.session_state.rtsp_active = False
                 st.stop()
 
-            st.info(f"Connecting to live feed: {source_clean}...")
+            # Ensure previous stale capture/writer are closed
+            if st.session_state.get('_live_capture'):
+                try:
+                    st.session_state._live_capture.release()
+                except Exception:
+                    pass
+                st.session_state._live_capture = None
+
             capture = StreamCapture(source_clean, target_fps=5.0)
             if not capture.isOpened():
                 st.error(f"Cannot connect to {source_clean}. Check network connection or camera address.")
                 st.session_state.rtsp_active = False
                 st.stop()
+            st.session_state._live_capture = capture
 
             geom = st.session_state.get('rtsp_geometry') or {}
             polygon = None
@@ -916,6 +1115,7 @@ if page == 'Live Monitoring':
             tracker = FlowTracker(line) if line is not None else None
             live_record_path = None
             live_writer = None
+
             try:
                 live_model = load_model(config.BEST_WEIGHTS_PATH)
                 class_ids = resolve_class_ids(live_model.names, config.TARGET_CLASS_NAMES)
@@ -927,9 +1127,9 @@ if page == 'Live Monitoring':
                     rec_dir.mkdir(parents=True, exist_ok=True)
                     live_record_path = rec_dir / f"rtsp_{datetime.now().strftime('%Y%m%d_%H%M%S')}.mp4"
                     live_writer = CompactVideoWriter(str(live_record_path), capture.width, capture.height, capture.fps, crf=21)
+                    st.session_state._live_writer = live_writer
 
-                st.markdown(f'<div style="background:#292E2A;border:1px solid #454B43;padding:8px 12px;border-radius:6px;display:flex;align-items:center;gap:8px;font-size:12px;"><span style="color:#C65D62;font-weight:700;">● LIVE SURVEILLANCE</span> ({capture.width}×{capture.height} @ {capture.fps:.0f} FPS) · {rtsp_loc}</div>', unsafe_allow_html=True)
-                stop_box = st.checkbox('Halt stream loop (Click when done)')
+                stop_checkbox = st.checkbox('⏹ Halt stream loop (Check to stop)', key='halt_stream_loop')
 
                 frame_count = 0
                 peak_count = 0
@@ -938,19 +1138,26 @@ if page == 'Live Monitoring':
                 curr_dets = []
                 curr_count = 0
                 curr_level = 'Low Crowd'
+                consecutive_drops = 0
 
-                for _ in range(2000):
-                    if stop_box or not st.session_state.get('rtsp_active'):
+                for _ in range(1200):
+                    if stop_checkbox or not st.session_state.get('rtsp_active', True):
                         break
-                    ok, frame, _ = capture.read(timeout=0.5)
+
+                    ok, frame, _ = capture.read(timeout=0.4)
                     if not ok or frame is None:
-                        time.sleep(0.02)
+                        consecutive_drops += 1
+                        if consecutive_drops > 25:
+                            st.warning("Live camera stream interrupted or disconnected.")
+                            break
+                        time.sleep(0.04)
                         continue
+                    consecutive_drops = 0
 
                     now = time.perf_counter()
                     if now - last_inf >= inf_interval:
                         last_inf = now
-                        dets = detect_heads_in_frame(live_model, frame, conf=0.35, iou=0.5, imgsz=640, device='cpu', class_ids=class_ids, native_head_class=native)
+                        dets = detect_heads_in_frame(live_model, frame, conf=float(st.session_state.get('setting_conf', 0.35)), iou=0.5, imgsz=int(st.session_state.get('setting_imgsz', 640)), device='cpu', class_ids=class_ids, native_head_class=native)
                         dets = in_zone(dets, frame.shape, polygon)
                         if tracker:
                             dets = tracker.update(dets, frame.shape, now)
@@ -984,11 +1191,22 @@ if page == 'Live Monitoring':
                     time.sleep(0.01)
 
             finally:
-                capture.release()
-                if live_writer:
-                    live_writer.close(success=True)
-                    if live_record_path and live_record_path.is_file():
-                        st.success(f"Recorded video saved ({mb(live_record_path.stat().st_size)}).")
+                if capture is not None:
+                    try:
+                        capture.release()
+                    except Exception:
+                        pass
+                if live_writer is not None:
+                    try:
+                        live_writer.close(success=True)
+                    except Exception:
+                        pass
+                st.session_state._live_capture = None
+                st.session_state._live_writer = None
+                st.session_state.rtsp_active = False
+
+                if live_record_path and live_record_path.is_file():
+                    st.success(f"Recorded video saved successfully ({mb(live_record_path.stat().st_size)}).")
         else:
             video_slot.info('Live stream is idle. Select source and click "Start Stream" to monitor.')
     st.stop()
