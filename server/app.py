@@ -28,7 +28,7 @@ ROOT = Path(config.OUTPUTS_ROOT)
 OWNER = 'c' * 32  # One explicitly shared campus-team workspace, not multi-tenant accounts.
 SESSIONS = ROOT / 'sessions' / OWNER
 ACTIVE = ('queued', 'running', 'cancelling')
-MAX_UPLOAD = 200 * 1024**2
+MAX_UPLOAD = int(os.environ.get('CROWD_MAX_UPLOAD_BYTES', 50 * 1024**3))
 pool = ThreadPoolExecutor(max_workers=1)
 model = None
 attempts = {}
@@ -211,7 +211,7 @@ async def upload(request: Request):
     if suffix not in ('.mp4', '.mov', '.avi', '.mkv'):
         raise HTTPException(415, 'Choose an MP4, MOV, AVI or MKV recording. Images remain supported in the legacy app.')
     if int(request.headers.get('content-length', '0') or '0') > MAX_UPLOAD:
-        raise HTTPException(413, 'Recording exceeds the 200 MB upload limit.')
+        raise HTTPException(413, 'Recording exceeds the maximum upload limit.')
     if upload_lock.locked():
         raise HTTPException(409, 'Another upload is in progress. Try again shortly.')
     async with upload_lock:
@@ -226,7 +226,7 @@ async def upload(request: Request):
                 async for chunk in request.stream():
                     size += len(chunk)
                     if size > MAX_UPLOAD:
-                        raise HTTPException(413, 'Recording exceeds the 200 MB upload limit.')
+                        raise HTTPException(413, 'Recording exceeds the maximum upload limit.')
                     target.write(chunk)
             cap = cv2.VideoCapture(str(path/('source'+suffix)))
             try:

@@ -52,8 +52,11 @@ def session_inventory(root):
     return sorted(sessions,key=lambda x:x['modified'],reverse=True)
 
 
-def check_storage_budget(root, additional_bytes, limit=2*1024**3):
+def check_storage_budget(root, additional_bytes, limit=None):
     """Fail before writing; callers serialize writes/jobs with the local workspace lock."""
+    if limit is None:
+        env_limit = os.environ.get('CROWD_STORAGE_LIMIT_BYTES')
+        limit = int(env_limit) if env_limit else 100 * 1024**3
     reserved=0
     for path in (Path(root)/'sessions').glob('*/*/status.json'):
         try:
@@ -62,7 +65,8 @@ def check_storage_budget(root, additional_bytes, limit=2*1024**3):
                 reserved+=max(0,150*1024**2-storage_bytes(path.parent))
         except (OSError,ValueError): pass
     if storage_bytes(root)+reserved+additional_bytes > limit:
-        raise ValueError('The 2 GB workspace limit would be exceeded. Remove saved sessions in Storage before continuing.')
+        limit_gb = limit / (1024**3)
+        raise ValueError(f'The {limit_gb:.0f} GB workspace storage limit would be exceeded. Remove saved sessions in Storage before continuing.')
 
 
 def clear_session(root, session_id):

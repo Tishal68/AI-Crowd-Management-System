@@ -282,15 +282,7 @@ iframe {
     justify-content: space-between;
     border-bottom: 1px solid #202D42;
     padding-bottom: 10px;
-    margin-bottom: 14px;
-}
-.cv-breadcrumb {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 11px;
-    color: #A1AEC2;
-    margin-bottom: 4px;
+    margin-bottom: 16px;
 }
 .cv-page-title {
     font-size: 20px;
@@ -321,32 +313,162 @@ iframe {
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
 }
 
+/* Unified Upload Panel & Dropzone */
+.cv-upload-panel {
+    background: #192438;
+    border: 1px solid #35445C;
+    border-radius: 12px;
+    padding: 18px 22px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+
+[data-testid="stFileUploader"] {
+    width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+[data-testid="stFileUploaderDropzone"] {
+    background-color: #131C2E !important;
+    border: 1.5px dashed #35445C !important;
+    border-radius: 10px !important;
+    padding: 24px 20px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+    gap: 8px !important;
+    transition: all 0.2s ease !important;
+    cursor: pointer !important;
+    min-height: 170px !important;
+}
+
+[data-testid="stFileUploaderDropzone"]:hover {
+    border-color: #7157E8 !important;
+    background-color: #162035 !important;
+}
+
+[data-testid="stFileUploaderDropzone"]::before {
+    content: "";
+    display: block;
+    width: 48px;
+    height: 48px;
+    margin: 0 auto 2px;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: contain;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 24 24' fill='none' stroke='%237157E8' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242'/%3E%3Cpath d='M12 12v9'/%3E%3Cpath d='m16 16-4-4-4 4'/%3E%3C/svg%3E");
+}
+
+[data-testid="stFileUploaderDropzoneInstructions"] {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+    margin-bottom: 4px !important;
+}
+
+[data-testid="stFileUploaderDropzoneInstructions"]::before {
+    content: "Drag and drop video or image here";
+    display: block;
+    font-size: 15px;
+    font-weight: 700;
+    color: #EDF2FA;
+    margin-bottom: 4px;
+}
+
+[data-testid="stFileUploaderDropzoneInstructions"]::after {
+    content: "Supported: MP4, AVI, MOV, JPG, PNG";
+    display: block;
+    font-size: 12px;
+    color: #A1AEC2;
+    margin-bottom: 8px;
+}
+
+/* Hide default streamlit instructions and any limit text */
+[data-testid="stFileUploaderDropzoneInstructions"] > div,
+[data-testid="stFileUploaderDropzoneInstructions"] > span,
+[data-testid="stFileUploaderDropzoneInstructions"] small,
+[data-testid="stFileUploaderDropzone"] span[class*="e3v525e4"] {
+    display: none !important;
+}
+
+/* Browse Files button styling as purple pill */
+[data-testid="stFileUploaderDropzone"] button {
+    background: #7157E8 !important;
+    color: #ffffff !important;
+    border: none !important;
+    border-radius: 20px !important;
+    padding: 7px 22px !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    box-shadow: 0 3px 12px rgba(113, 87, 232, 0.45) !important;
+    transition: all 0.2s ease !important;
+    cursor: pointer !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+[data-testid="stFileUploaderDropzone"] button:hover {
+    background: #826bf0 !important;
+    box-shadow: 0 4px 16px rgba(113, 87, 232, 0.65) !important;
+    transform: translateY(-1px);
+}
+
+/* Sample video button styling */
+.cv-sample-btn button {
+    background: #202D42 !important;
+    border: 1px solid #35445C !important;
+    border-radius: 6px !important;
+    color: #EDF2FA !important;
+    font-size: 12.5px !important;
+    font-weight: 500 !important;
+    padding: 6px 14px !important;
+    transition: all 0.15s ease !important;
+}
+.cv-sample-btn button:hover {
+    background: #283852 !important;
+    border-color: #4a5d7c !important;
+    color: #ffffff !important;
+}
+
 /* Capability Cards */
 .cv-capability-card {
     background: #192438;
     border: 1px solid #35445C;
-    border-radius: 8px;
-    padding: 10px 12px;
+    border-radius: 10px;
+    padding: 18px 20px;
     display: flex;
-    align-items: flex-start;
-    gap: 10px;
+    flex-direction: column;
+    justify-content: flex-start;
     height: 100%;
-    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+    min-height: 110px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+    transition: border-color 0.2s ease, transform 0.2s ease;
+}
+.cv-capability-card:hover {
+    border-color: #4a5d7c;
+    transform: translateY(-2px);
 }
 .cv-cap-icon {
-    font-size: 18px;
-    line-height: 1.2;
+    font-size: 24px;
+    line-height: 1;
+    margin-bottom: 8px;
 }
 .cv-cap-title {
-    font-size: 13px;
-    font-weight: 600;
+    font-size: 14px;
+    font-weight: 700;
     color: #EDF2FA;
-    margin-bottom: 2px;
+    margin-bottom: 4px;
 }
 .cv-cap-desc {
-    font-size: 11.5px;
+    font-size: 12px;
     color: #A1AEC2;
-    line-height: 1.4;
+    line-height: 1.45;
 }
 
 /* RESPONSIVE KPI CONTAINER (No Text Truncation) */
@@ -625,13 +747,6 @@ def render_page_header(title, subtitle="", meta=None):
     st.markdown(f'''
     <div class="cv-page-header">
       <div>
-        <div class="cv-breadcrumb">
-          <span style="opacity:0.7">⌂</span>
-          <span style="opacity:0.35">›</span>
-          <span>Campus Operations</span>
-          <span style="opacity:0.35">›</span>
-          <span style="color:#EDF2FA;font-weight:600">Review Footage</span>
-        </div>
         <div class="cv-page-title">
           <span style="color:#7157E8;margin-right:8px;font-size:20px;">🎬</span> {title}
         </div>
@@ -703,7 +818,8 @@ def media_uploader(disabled=False):
         type=config.ALLOWED_IMAGE_TYPES + config.ALLOWED_VIDEO_TYPES,
         key=f'media_{st.session_state.upload_generation}',
         disabled=disabled,
-        help='Up to 200 MB and 10 minutes. Original file is processed locally on your machine.',
+        label_visibility='collapsed',
+        help='Original file is processed locally on your machine with zero external network transmission.',
     )
 
 page = render_sidebar()
@@ -1413,44 +1529,59 @@ def render_results(record):
 def render_empty_state():
     render_page_header(
         title="Review Footage / Analysis",
-        subtitle="Analyze recorded videos, define counting regions, and measure crowd occupancy & flow.",
+        subtitle="Analyse recorded videos, define counting regions and monitor crowd occupancy and flow.",
     )
 
     st.markdown('''
-    <div class="cv-panel-card" style="padding: 12px 16px; margin-bottom: 8px;">
-      <div style="font-size: 14.5px; font-weight: 700; color: #EDF2FA; margin-bottom: 2px;">
-        Upload Recorded Footage
+    <div class="cv-upload-panel">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+        <div style="width:36px;height:36px;border-radius:8px;background:#202D42;border:1px solid #35445C;display:flex;align-items:center;justify-content:center;color:#7157E8;font-size:18px;">
+          ☁
+        </div>
+        <div>
+          <div style="font-size:15px;font-weight:700;color:#EDF2FA;line-height:1.2;">
+            Upload Recorded Footage
+          </div>
+          <div style="font-size:12px;color:#A1AEC2;margin-top:2px;">
+            Upload a campus video or image to begin crowd analysis.
+          </div>
+        </div>
       </div>
-      <div style="font-size: 12px; color: #A1AEC2; margin-bottom: 8px;">
-        Upload a campus video or photograph to begin crowd analysis.
-      </div>
-    </div>
     ''', unsafe_allow_html=True)
 
     uploaded = media_uploader()
     if uploaded is not None:
-        raw = uploaded.getbuffer()
-        digest = hashlib.sha256(raw).hexdigest()
+        file_size = uploaded.size
         suffix = Path(uploaded.name).suffix.lower()
         OUTPUTS.mkdir(parents=True, exist_ok=True)
         session_dir = SESSIONS / st.session_state.session_id
         session_dir.mkdir(parents=True, exist_ok=True)
         source = session_dir / ('input' + suffix)
+        hasher = hashlib.sha256()
         try:
-            with FileLock(str(OUTPUTS / '.dispatch.lock'), timeout=5):
-                check_storage_budget(OUTPUTS, len(raw))
-                source.write_bytes(raw)
+            with FileLock(str(OUTPUTS / '.dispatch.lock'), timeout=10):
+                check_storage_budget(OUTPUTS, file_size)
+                with open(source, 'wb') as dst:
+                    uploaded.seek(0)
+                    while chunk := uploaded.read(8 * 1024 * 1024):
+                        hasher.update(chunk)
+                        dst.write(chunk)
+            digest = hasher.hexdigest()
             st.session_state.custom_video_source = str(source)
             st.session_state.custom_file_name = uploaded.name
             st.session_state.upload_hash = digest
             st.session_state.pop('result', None)
             st.rerun()
         except Exception as exc:
+            if source.exists():
+                source.unlink(missing_ok=True)
             st.error(str(exc))
             st.stop()
 
+    st.markdown('<div style="height: 10px;"></div>', unsafe_allow_html=True)
     col_act, col_priv = st.columns([1.1, 1.9])
     with col_act:
+        st.markdown('<div class="cv-sample-btn">', unsafe_allow_html=True)
         if st.button('📁 Load Sample Video', width='stretch'):
             if DEMO_VIDEO.is_file():
                 raw = DEMO_VIDEO.read_bytes()
@@ -1465,44 +1596,47 @@ def render_empty_state():
                 st.rerun()
             else:
                 st.error('Bundled sample video not found on disk.')
+        st.markdown('</div>', unsafe_allow_html=True)
     with col_priv:
         st.markdown('''
-        <div style="display:flex;align-items:center;height:100%;font-size:11.5px;color:#A1AEC2;gap:6px;padding-left:4px;">
-          <span style="color:#35D995;">🔒</span>
-          <span><strong>Local Processing</strong> · Video inference runs locally on your machine.</span>
+        <div style="display:flex;align-items:center;height:100%;font-size:12px;color:#A1AEC2;gap:6px;padding-left:4px;">
+          <span style="color:#35D995;font-size:13px;">🔒</span>
+          <span><strong style="color:#EDF2FA;">Local Processing</strong> · Video inference runs locally on your machine.</span>
         </div>
         ''', unsafe_allow_html=True)
 
-    st.markdown('<div style="height: 12px;"></div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)  # Close cv-upload-panel
+
+    st.markdown('''
+    <div style="display:flex;align-items:center;gap:8px;font-size:15px;font-weight:700;color:#EDF2FA;margin-top:16px;margin-bottom:12px;">
+      <span style="font-size:16px;">📚</span>
+      <span>CrowdVision Capabilities</span>
+    </div>
+    ''', unsafe_allow_html=True)
+
     c1, c2, c3 = st.columns(3)
     with c1:
         st.markdown('''
         <div class="cv-capability-card">
-          <div class="cv-cap-icon">👥</div>
-          <div>
-            <div class="cv-cap-title">Crowd Detection & Occupancy</div>
-            <div class="cv-cap-desc">Real-time YOLO11 head detection inside custom polygonal regions with accurate headcounts.</div>
-          </div>
+          <div class="cv-cap-icon" style="color:#7157E8;">👥</div>
+          <div class="cv-cap-title">Crowd Detection & Occupancy</div>
+          <div class="cv-cap-desc">YOLO11-based people detection and occupancy counting.</div>
         </div>
         ''', unsafe_allow_html=True)
     with c2:
         st.markdown('''
         <div class="cv-capability-card">
-          <div class="cv-cap-icon">⇄</div>
-          <div>
-            <div class="cv-cap-title">Directional Flow Analysis</div>
-            <div class="cv-cap-desc">Bidirectional vector tracking across virtual tripwire lines to compute net entry vs. exit velocity.</div>
-          </div>
+          <div class="cv-cap-icon" style="color:#32C5F4;">⇄</div>
+          <div class="cv-cap-title">Directional Flow Analysis</div>
+          <div class="cv-cap-desc">Track movement and calculate entry and exit flow.</div>
         </div>
         ''', unsafe_allow_html=True)
     with c3:
         st.markdown('''
         <div class="cv-capability-card">
-          <div class="cv-cap-icon">⚠️</div>
-          <div>
-            <div class="cv-cap-title">Safety & Incident Detection</div>
-            <div class="cv-cap-desc">Automated exceedance rules capture sustained crowding events, timestamps, and compliance audits.</div>
-          </div>
+          <div class="cv-cap-icon" style="color:#F5B942;">⚠️</div>
+          <div class="cv-cap-title">Safety & Incident Detection</div>
+          <div class="cv-cap-desc">Monitor capacity limits and detect sustained crowding.</div>
         </div>
         ''', unsafe_allow_html=True)
 
@@ -1559,7 +1693,7 @@ with col_h1:
         subtitle="Configure monitored counting regions and calibrate detection parameters for inference.",
     )
 with col_h2:
-    if st.button('📁 Change Video', width='stretch'):
+    if st.button('📁 Replace Video', width='stretch'):
         reset_session()
         st.rerun()
 
