@@ -98,6 +98,23 @@ class ApiTests(unittest.TestCase):
         r_bad = self.client.post('/api/camera/check', json={'source': 'ftp://bad-url'}, headers=self.headers)
         self.assertEqual(r_bad.status_code, 200)
         self.assertFalse(r_bad.json()['connected'])
+    def test_frontend_rendered_assets_clean_of_model_system(self):
+        import re
+        res = self.client.get('/')
+        self.assertEqual(res.status_code, 200)
+        self.assertIn('<div id="root"></div>', res.text)
+        js_match = re.search(r'src="(/assets/[^"]+\.js)"', res.text)
+        self.assertTrue(bool(js_match))
+        js_res = self.client.get(js_match.group(1))
+        self.assertEqual(js_res.status_code, 200)
+        self.assertNotIn('Model & System', js_res.text)
+        self.assertIn('Footage Settings', js_res.text)
+        css_match = re.search(r'href="(/assets/[^"]+\.css)"', res.text)
+        self.assertTrue(bool(css_match))
+        css_res = self.client.get(css_match.group(1))
+        self.assertEqual(css_res.status_code, 200)
+        self.assertIn('cv-footage-settings-dropdown', css_res.text)
+        self.assertNotIn('cv-settings-popover', css_res.text)
     def test_busy_worker_and_immutable_result_and_cancel(self):
         self.login();key='a'*32;path=self.sessions/key;path.mkdir()
         atomic_json(path/'metadata.json',dict(created=1,file_name='clip.mp4',source='source.mp4'))

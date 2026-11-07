@@ -453,7 +453,7 @@ function App() {
 
   return (
     <div className="cv-app-shell">
-      {/* 1. TOP HEADER (Brand Left, Operations Center, Ready + Settings Right) */}
+      {/* 1. TOP HEADER (Brand Left, Operations Center, Sign Out Right) */}
       <header className="cv-header">
         <div className="cv-header-left">
           <div className="cv-brand-icon">
@@ -473,11 +473,6 @@ function App() {
         </div>
 
         <div className="cv-header-right">
-          <div className={`cv-status-pill ${systemStatus && !systemStatus.detector_ready ? "warning" : ""}`}>
-            <span className={`cv-status-dot ${systemStatus && !systemStatus.detector_ready ? "warning" : ""}`} />
-            <span>{systemStatus?.detector_ready === false ? "Detector Unavailable" : "System Ready"}</span>
-          </div>
-
           <button
             className="cv-signout-btn"
             aria-label="Sign out"
