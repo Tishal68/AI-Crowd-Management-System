@@ -1129,9 +1129,19 @@ if page == 'Live Monitoring':
             with st.spinner('Grabbing frame from camera...'):
                 from src.core.stream_reader import StreamCapture
                 clean_target = resolve_camera_connection_uri(source_clean)
-                cap_snap = StreamCapture(clean_target, target_fps=5)
-                ok, snap_frame, _ = cap_snap.read(timeout=3.0)
-                cap_snap.release()
+                cap_snap = None
+                ok, snap_frame = False, None
+                try:
+                    cap_snap = StreamCapture(clean_target, target_fps=5)
+                    ok, snap_frame, _ = cap_snap.read(timeout=3.0)
+                except Exception:
+                    ok, snap_frame = False, None
+                finally:
+                    if cap_snap is not None:
+                        try:
+                            cap_snap.release()
+                        except Exception:
+                            pass
                 if ok and snap_frame is not None:
                     st.session_state.rtsp_preview = snap_frame
                     st.success('Camera snapshot captured! Define your counting region below.')

@@ -31,14 +31,21 @@ def normalize_stream_source(source: Union[str, int]) -> Union[str, int]:
 
 
 def configure_stream_backend():
-    """Configure OpenCV FFmpeg backend for reliable TCP RTSP streaming without packet loss."""
-    # Force TCP for RTSP (prevents UDP frame corruption and grey blocks) and minimize delay
-    os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = 'rtsp_transport;tcp|max_delay;500000|buffer_size;1024000'
+    """Configure OpenCV FFmpeg backend for reliable TCP RTSP streaming with bounded timeouts."""
+    # Force TCP for RTSP (prevents UDP frame corruption and grey blocks) and bound network socket timeouts
+    # stimeout: RTSP/TCP socket timeout in microseconds (3,000,000 us = 3.0s)
+    # rw_timeout: Read/write network timeout in microseconds
+    # max_delay: Maximum demuxing delay
+    # buffer_size: Demuxing buffer size
+    os.environ['OPENCV_FFMPEG_CAPTURE_OPTIONS'] = (
+        'rtsp_transport;tcp|stimeout;3000000|rw_timeout;3000000|timeout;3000000|max_delay;500000|buffer_size;1024000'
+    )
 
 
 class StreamCapture:
     """
-    Threaded, non-blocking RTSP / camera capture with fresh frame validation.
+    Threaded, non-blocking RTSP / camera capture with fresh frame validation,
+    controlled exponential backoff auto-reconnection, and safe resource ownership.
 
     Standard cv2.VideoCapture buffers 30+ frames internally. When YOLO detection takes
     50-100ms per frame, naive Capture falls behind real-time by seconds or minutes.
@@ -53,16 +60,26 @@ class StreamCapture:
         reconnect_timeout: float = 15.0,
         target_fps: Optional[float] = None,
         stale_timeout: float = 1.0,
+        min_reconnect_interval: float = 0.5,
+        max_reconnect_interval: float = 10.0,
+        backoff_factor: float = 1.5,
+        shutdown_timeout: float = 2.0,
     ):
         configure_stream_backend()
         self.source = normalize_stream_source(source)
         self.reconnect_timeout = reconnect_timeout
         self.target_fps = target_fps
         self.stale_timeout = stale_timeout
+        self.min_reconnect_interval = min_reconnect_interval
+        self.max_reconnect_interval = max_reconnect_interval
+        self.backoff_factor = backoff_factor
+        self.shutdown_timeout = shutdown_timeout
 
         self.cap: Optional[cv2.VideoCapture] = None
         self._lock = threading.Lock()
+        self._shutdown_lock = threading.Lock()
         self._running = False
+        self._released = False
         self._thread: Optional[threading.Thread] = None
 
         self._latest_frame: Optional[np.ndarray] = None
@@ -81,12 +98,16 @@ class StreamCapture:
 
     def _connect(self) -> bool:
         with self._lock:
-            if self.cap is not None:
+            if not self._running and self._released:
+                return False
+
+            old_cap = self.cap
+            self.cap = None
+            if old_cap is not None:
                 try:
-                    self.cap.release()
+                    old_cap.release()
                 except Exception:
                     pass
-                self.cap = None
 
             # Reset frame state and timestamps on connection / reconnection
             self._latest_frame = None
@@ -94,13 +115,33 @@ class StreamCapture:
             self._last_delivered_pts = 0.0
             self._is_opened = False
 
-            self.cap = cv2.VideoCapture(self.source, cv2.CAP_FFMPEG if isinstance(self.source, str) else cv2.CAP_ANY)
-            if not self.cap.isOpened():
-                # Fallback for webcam or standard backend
-                self.cap = cv2.VideoCapture(self.source)
+        # OpenCV VideoCapture open performed outside self._lock to prevent blocking lock during network operations
+        new_cap = None
+        try:
+            new_cap = cv2.VideoCapture(self.source, cv2.CAP_FFMPEG if isinstance(self.source, str) else cv2.CAP_ANY)
+            if not new_cap.isOpened():
+                new_cap.release()
+                new_cap = cv2.VideoCapture(self.source)
+        except Exception:
+            if new_cap is not None:
+                try:
+                    new_cap.release()
+                except Exception:
+                    pass
+            new_cap = None
 
-            if self.cap.isOpened():
-                # Request 1-frame buffer where supported
+        with self._lock:
+            # Check if shutdown occurred while opening
+            if self._released or (self._thread is not None and not self._running):
+                if new_cap is not None:
+                    try:
+                        new_cap.release()
+                    except Exception:
+                        pass
+                return False
+
+            if new_cap is not None and new_cap.isOpened():
+                self.cap = new_cap
                 try:
                     self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
                 except Exception:
@@ -119,70 +160,107 @@ class StreamCapture:
                     self.fps = float(self.target_fps)
 
                 # Read test frame to confirm decoding
-                ret, frame = self.cap.read()
+                try:
+                    ret, frame = self.cap.read()
+                except Exception:
+                    ret, frame = False, None
+
                 if ret and frame is not None:
                     self._latest_frame = frame
                     self._latest_pts = time.perf_counter()
+                    self._last_delivered_pts = 0.0
                     self.width = frame.shape[1]
                     self.height = frame.shape[0]
                     self._is_opened = True
                     self._last_read_success_time = time.time()
                     return True
 
+            if new_cap is not None:
+                try:
+                    new_cap.release()
+                except Exception:
+                    pass
+            self.cap = None
             self._is_opened = False
             self._latest_frame = None
             self._latest_pts = 0.0
             return False
 
     def start(self):
-        if self._running:
+        if self._running or self._released:
             return
         self._running = True
         self._thread = threading.Thread(target=self._worker, daemon=True, name='RTSPReaderWorker')
         self._thread.start()
 
     def _worker(self):
-        while self._running:
-            cap_handle = None
-            is_open = False
-            with self._lock:
-                if not self._running:
-                    break
-                cap_handle = self.cap
-                is_open = self._is_opened
-
-            if not is_open or cap_handle is None:
-                # Stream disconnected: ensure stale frame is cleared
+        backoff = self.min_reconnect_interval
+        try:
+            while self._running:
+                cap_handle = None
+                is_open = False
                 with self._lock:
-                    self._latest_frame = None
-                    self._latest_pts = 0.0
-                if time.time() - self._last_read_success_time > self.reconnect_timeout:
-                    time.sleep(0.5)
+                    if not self._running:
+                        break
+                    cap_handle = self.cap
+                    is_open = self._is_opened
+
+                if not is_open or cap_handle is None:
+                    # Stream disconnected: ensure stale frame is cleared
+                    with self._lock:
+                        self._latest_frame = None
+                        self._latest_pts = 0.0
+                        self._is_opened = False
+
+                    # Controlled exponential backoff sleep with responsive interruption check
+                    slept = 0.0
+                    while self._running and slept < backoff:
+                        step = min(0.05, backoff - slept)
+                        time.sleep(step)
+                        slept += step
+
+                    if not self._running:
+                        break
+
+                    # Attempt reconnection
+                    reconnected = self._connect()
+                    if reconnected:
+                        backoff = self.min_reconnect_interval
+                    else:
+                        backoff = min(backoff * self.backoff_factor, self.max_reconnect_interval)
                     continue
-                time.sleep(0.2)
-                self._connect()
-                continue
 
-            try:
-                ret, frame = cap_handle.read()
-            except Exception:
-                ret, frame = False, None
+                try:
+                    ret, frame = cap_handle.read()
+                except Exception:
+                    ret, frame = False, None
 
-            now = time.perf_counter()
-            if ret and frame is not None and self._running:
-                with self._lock:
-                    self._latest_frame = frame
-                    self._latest_pts = now
-                    self._frame_counter += 1
-                    self._last_read_success_time = time.time()
-            else:
-                # Stream stalled or connection lost: clear stale frames
-                with self._lock:
-                    if time.time() - self._last_read_success_time > 2.0:
+                now = time.perf_counter()
+                if ret and frame is not None and self._running:
+                    with self._lock:
+                        self._latest_frame = frame
+                        self._latest_pts = now
+                        self._frame_counter += 1
+                        self._last_read_success_time = time.time()
+                    backoff = self.min_reconnect_interval
+                else:
+                    # Stream stalled or connection lost: clear stale frames
+                    with self._lock:
                         self._is_opened = False
                         self._latest_frame = None
                         self._latest_pts = 0.0
-                time.sleep(0.01)
+                    time.sleep(0.02)
+        finally:
+            with self._lock:
+                if self.cap is not None:
+                    try:
+                        self.cap.release()
+                    except Exception:
+                        pass
+                    self.cap = None
+                self._is_opened = False
+                self._latest_frame = None
+                self._latest_pts = 0.0
 
     def read(
         self,
@@ -201,7 +279,7 @@ class StreamCapture:
 
         while time.time() <= deadline:
             with self._lock:
-                if not self._running or not self._is_opened:
+                if not self._running or self._released or not self._is_opened:
                     self._latest_frame = None
                     self._latest_pts = 0.0
                 elif self._latest_frame is not None:
@@ -223,7 +301,7 @@ class StreamCapture:
 
     def isOpened(self) -> bool:
         with self._lock:
-            return self._is_opened and (self.cap is not None and self.cap.isOpened())
+            return not self._released and self._is_opened and (self.cap is not None and self.cap.isOpened())
 
     def get(self, prop_id: int):
         with self._lock:
@@ -243,21 +321,38 @@ class StreamCapture:
         return 0
 
     def release(self):
-        self._running = False
-        # Wait for worker thread to terminate completely BEFORE releasing OpenCV capture
+        """
+        Idempotent, thread-safe shutdown of worker thread and capture resource.
+        Guarantees that native VideoCapture is not concurrently touched while worker is active.
+        """
+        with self._shutdown_lock:
+            if self._released:
+                return
+            self._released = True
+            self._running = False
+            with self._lock:
+                self._is_opened = False
+                self._latest_frame = None
+                self._latest_pts = 0.0
+
+        # Wait for worker thread to terminate if it can
+        # Note: If the underlying native backend blocks indefinitely in an un-interruptible socket call,
+        # the thread may not exit within join timeout.
         if self._thread and self._thread.is_alive():
             if threading.current_thread() != self._thread:
-                self._thread.join(timeout=2.0)
+                self._thread.join(timeout=self.shutdown_timeout)
+
+        # Safe resource ownership:
+        # We do NOT touch self.cap concurrently while the worker thread is still alive and reading from it.
+        # If the worker has terminated (or never started), clean up any lingering handle.
         with self._lock:
-            if self.cap is not None:
-                try:
-                    self.cap.release()
-                except Exception:
-                    pass
-                self.cap = None
-            self._is_opened = False
-            self._latest_frame = None
-            self._latest_pts = 0.0
+            if self._thread is None or not self._thread.is_alive():
+                if self.cap is not None:
+                    try:
+                        self.cap.release()
+                    except Exception:
+                        pass
+                    self.cap = None
 
     def __enter__(self):
         return self

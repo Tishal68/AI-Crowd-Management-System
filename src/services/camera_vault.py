@@ -64,50 +64,161 @@ def _dpapi_unprotect(data: bytes) -> bytes:
     return res
 
 
-def get_vault_master_key() -> bytes:
+def _has_existing_credentials(registry_path: Optional[Path] = None) -> bool:
+    """Check if registered cameras exist with encrypted credentials."""
+    path = registry_path or _REGISTRY_FILE
+    if not path.is_file():
+        return False
+    try:
+        content = path.read_text(encoding='utf-8')
+        cams = json.loads(content)
+        if isinstance(cams, list):
+            for c in cams:
+                if isinstance(c, dict):
+                    uri = str(c.get('uri', '')).strip()
+                    if uri.startswith(('enc:v1:', 'enc:v2:')):
+                        return True
+    except Exception:
+        pass
+    return False
+
+
+def _enforce_secure_file_permissions(path: Path):
+    """
+    On POSIX platforms, enforce 0o600 permissions (read/write by owner only).
+    Fails safely if permissions cannot be restricted to owner-only.
+    """
+    if sys.platform != 'win32':
+        try:
+            os.chmod(str(path), 0o600)
+            mode = os.stat(str(path)).st_mode
+            if (mode & 0o077) != 0:
+                raise PermissionError(f"Cannot secure key file permissions at {path}: group or world access permitted.")
+        except OSError as err:
+            raise PermissionError(f"Failed to enforce secure file permissions on {path}: {err}") from err
+
+
+def _write_secure_raw_key(path: Path, key: bytes):
+    """
+    Non-Windows secure key storage policy:
+    1. Write key to temporary file with 0o600 permissions (owner read/write only).
+    2. Atomically replace target path.
+    3. Verify permissions cannot be read by other local users.
+    """
+    temp_key = path.with_suffix('.tmp_key')
+    fd = os.open(str(temp_key), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, 'wb') as f:
+        f.write(b'RAW:' + key)
+    _enforce_secure_file_permissions(temp_key)
+    temp_key.replace(path)
+    _enforce_secure_file_permissions(path)
+
+
+def get_vault_master_key(key_file: Optional[Path] = None, force_refresh: bool = False) -> bytes:
     """
     Retrieve or generate the local 32-byte (256-bit) AES vault master key.
-    Uses Windows DPAPI on Windows; uses restricted permissions (0o600) on non-Windows.
+    - Uses Windows DPAPI on Windows; fails safely without raw fallback if DPAPI fails.
+    - Uses environment variable (CROWDVISION_VAULT_KEY) or restricted 0o600 permissions on non-Windows.
+    - Never regenerates key silently when existing encrypted credentials depend on it.
     """
     global _MASTER_KEY_CACHE
-    if _MASTER_KEY_CACHE is not None:
+    if not force_refresh and key_file is None and _MASTER_KEY_CACHE is not None:
         return _MASTER_KEY_CACHE
 
-    _VAULT_KEY_FILE.parent.mkdir(parents=True, exist_ok=True)
-    if _VAULT_KEY_FILE.is_file():
-        try:
-            raw = _VAULT_KEY_FILE.read_bytes()
-            if raw.startswith(b'DPAPI:'):
-                key = _dpapi_unprotect(raw[6:])
-            elif raw.startswith(b'RAW:'):
-                key = raw[4:]
-            else:
-                key = raw
-            if len(key) == 32:
-                _MASTER_KEY_CACHE = key
-                return key
-        except Exception:
-            pass  # Fall through to regenerate if corrupted
+    target_file = key_file or _VAULT_KEY_FILE
 
-    # Generate fresh 32-byte key
+    # 1. Check environment variable override (recommended for containerized/headless deployments)
+    env_key = os.environ.get('CROWDVISION_VAULT_KEY') or os.environ.get('CROWDVISION_MASTER_KEY')
+    if env_key:
+        cleaned = env_key.strip()
+        parsed: Optional[bytes] = None
+        if len(cleaned) == 64:
+            try:
+                parsed = bytes.fromhex(cleaned)
+            except ValueError:
+                parsed = None
+        if parsed is None and len(cleaned) in (43, 44):
+            try:
+                parsed = base64.urlsafe_b64decode(cleaned.encode('ascii'))
+            except Exception:
+                parsed = None
+        if parsed is None and len(cleaned.encode('utf-8')) == 32:
+            parsed = cleaned.encode('utf-8')
+
+        if parsed is not None and len(parsed) == 32:
+            if key_file is None:
+                _MASTER_KEY_CACHE = parsed
+            return parsed
+        raise ValueError("CROWDVISION_VAULT_KEY must be a 32-byte key (raw, 64 hex characters, or base64).")
+
+    target_file.parent.mkdir(parents=True, exist_ok=True)
+
+    # 2. Existing key file
+    if target_file.is_file():
+        raw = target_file.read_bytes()
+        if raw.startswith(b'DPAPI:'):
+            if not _dpapi_available():
+                raise RuntimeError("DPAPI-encrypted master key file cannot be decrypted on a non-Windows platform.")
+            try:
+                key = _dpapi_unprotect(raw[6:])
+            except Exception as err:
+                raise RuntimeError(
+                    "Windows DPAPI decryption failed for existing camera vault master key. "
+                    "Refusing to regenerate key to protect existing camera credentials from unrecoverable loss. "
+                    "Ensure application runs under the original Windows user profile."
+                ) from err
+
+            if len(key) != 32:
+                raise RuntimeError("Decrypted vault master key has invalid length (expected 32 bytes). Refusing to overwrite.")
+            if key_file is None:
+                _MASTER_KEY_CACHE = key
+            return key
+
+        elif raw.startswith(b'RAW:') or len(raw) == 32:
+            key = raw[4:] if raw.startswith(b'RAW:') else raw
+            if len(key) != 32:
+                raise RuntimeError("Corrupted master key file: invalid length.")
+
+            if _dpapi_available():
+                # On Windows, transparently upgrade raw key to DPAPI
+                try:
+                    enc = _dpapi_protect(key)
+                    target_file.write_bytes(b'DPAPI:' + enc)
+                except Exception:
+                    pass
+            else:
+                _enforce_secure_file_permissions(target_file)
+
+            if key_file is None:
+                _MASTER_KEY_CACHE = key
+            return key
+
+        raise RuntimeError("Unrecognized master key format. Refusing to regenerate key to avoid credential loss.")
+
+    # 3. Key file does not exist: prevent generating a new key if existing credentials exist without a key
+    if _has_existing_credentials():
+        raise RuntimeError(
+            "Encrypted camera credentials exist in cameras.json, but master key file is missing. "
+            "Refusing to generate a new key to avoid permanent credential loss."
+        )
+
+    # 4. Generate fresh 32-byte key
     key = secrets.token_bytes(32)
-    saved = False
+
     if _dpapi_available():
         try:
             enc = _dpapi_protect(key)
-            _VAULT_KEY_FILE.write_bytes(b'DPAPI:' + enc)
-            saved = True
-        except Exception:
-            pass
+            target_file.write_bytes(b'DPAPI:' + enc)
+        except Exception as err:
+            raise RuntimeError(
+                "Windows DPAPI protection failed when securing new vault master key. "
+                "Refusing to save an unprotected key to disk."
+            ) from err
+    else:
+        _write_secure_raw_key(target_file, key)
 
-    if not saved:
-        _VAULT_KEY_FILE.write_bytes(b'RAW:' + key)
-        try:
-            os.chmod(str(_VAULT_KEY_FILE), 0o600)
-        except Exception:
-            pass
-
-    _MASTER_KEY_CACHE = key
+    if key_file is None:
+        _MASTER_KEY_CACHE = key
     return key
 
 
@@ -313,18 +424,25 @@ def test_camera_connection(source_uri: Union[str, int]) -> Tuple[bool, int, int,
     """
     Safely probe a stream URL or webcam index.
     Credentials are unprotected strictly in memory and never logged or leaked.
+    Capture handle is guaranteed to be released in all execution paths via finally.
     Returns (ok, width, height, fps).
     """
     from src.core.stream_reader import StreamCapture
     clean_target = resolve_camera_connection_uri(source_uri)
+    cap = None
     try:
         cap = StreamCapture(clean_target, target_fps=5)
         ok, frame, _ = cap.read(timeout=2.5)
         w, h, fps = cap.width, cap.height, int(cap.fps)
-        cap.release()
-        return ok and frame is not None, w, h, fps
+        return bool(ok and frame is not None), w, h, fps
     except Exception:
         return False, 0, 0, 0
+    finally:
+        if cap is not None:
+            try:
+                cap.release()
+            except Exception:
+                pass
 
 
 # ---------------------------------------------------------
@@ -333,15 +451,32 @@ def test_camera_connection(source_uri: Union[str, int]) -> Tuple[bool, int, int,
 _GLOBAL_CAPTURE_LOCK = threading.Lock()
 _CURRENT_CAPTURE: Optional[Any] = None
 _CURRENT_WRITER: Optional[Any] = None
+_UNSET = object()
 
 
-def register_active_stream(capture: Optional[Any] = None, writer: Optional[Any] = None):
-    """Register active stream capture and writer objects for tracking and cleanup."""
+def register_active_stream(
+    capture: Any = _UNSET,
+    writer: Any = _UNSET,
+    clear_capture: bool = False,
+    clear_writer: bool = False,
+):
+    """
+    Register or clear active stream capture and writer handles independently.
+    - Registering a capture does not clear an active writer.
+    - Registering a writer works independently.
+    - Explicitly passing writer=None or clear_writer=True clears the writer reference.
+    - Explicitly passing capture=None or clear_capture=True clears the capture reference.
+    """
     global _CURRENT_CAPTURE, _CURRENT_WRITER
     with _GLOBAL_CAPTURE_LOCK:
-        if capture is not None:
+        if clear_capture:
+            _CURRENT_CAPTURE = None
+        elif capture is not _UNSET:
             _CURRENT_CAPTURE = capture
-        if writer is not None:
+
+        if clear_writer:
+            _CURRENT_WRITER = None
+        elif writer is not _UNSET:
             _CURRENT_WRITER = writer
 
 
@@ -352,18 +487,25 @@ def get_active_stream() -> Tuple[Optional[Any], Optional[Any]]:
 
 
 def release_global_stream():
-    """Immediately stop and release any active OpenCV capture and video writer resources."""
+    """
+    Immediately stop and release any active OpenCV capture and video writer resources.
+    Guarantees each resource is closed exactly once without double-closing.
+    """
     global _CURRENT_CAPTURE, _CURRENT_WRITER
     with _GLOBAL_CAPTURE_LOCK:
-        if _CURRENT_CAPTURE is not None:
-            try:
-                _CURRENT_CAPTURE.release()
-            except Exception:
-                pass
-            _CURRENT_CAPTURE = None
-        if _CURRENT_WRITER is not None:
-            try:
-                _CURRENT_WRITER.close(success=True)
-            except Exception:
-                pass
-            _CURRENT_WRITER = None
+        cap = _CURRENT_CAPTURE
+        writer = _CURRENT_WRITER
+        _CURRENT_CAPTURE = None
+        _CURRENT_WRITER = None
+
+    if cap is not None:
+        try:
+            cap.release()
+        except Exception:
+            pass
+
+    if writer is not None:
+        try:
+            writer.close(success=True)
+        except Exception:
+            pass
