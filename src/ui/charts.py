@@ -10,17 +10,21 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 # Enterprise Design System Palette
-MAIN_BG = '#0E1525'
-CARD_BG = '#192438'
-SURFACE_BG = '#202D42'
-BORDER_COLOR = '#35445C'
-PURPLE = '#7157E8'
-CYAN = '#32C5F4'
-EMERALD = '#35D995'
-AMBER = '#F5B942'
-CORAL = '#F36B78'
-TEXT_PRIMARY = '#EDF2FA'
-TEXT_SECONDARY = '#A1AEC2'
+# Modern Enterprise Charcoal & Emerald Palette
+MAIN_BG = '#171A18'
+CARD_BG = '#292E2A'
+SURFACE_BG = '#343B35'
+BORDER_COLOR = '#454B43'
+PRIMARY = '#087F5B'
+PURPLE = '#087F5B'  # Backwards compatibility alias
+SECONDARY = '#B87345'
+CYAN = '#B87345'    # Backwards compatibility alias
+EMERALD = '#3D9970' # Forest green success
+AMBER = '#D9A441'   # Warm amber highlight
+WARNING = '#D98236' # Burnt orange warning
+CORAL = '#C65D62'   # Muted crimson critical
+TEXT_PRIMARY = '#F2F0E8'
+TEXT_SECONDARY = '#B6B8AE'
 
 
 def create_occupancy_timeline(
@@ -56,7 +60,7 @@ def create_occupancy_timeline(
     fig.add_hrect(
         y0=capacity,
         y1=y_max,
-        fillcolor="rgba(243, 107, 120, 0.06)",
+        fillcolor="rgba(198, 93, 98, 0.08)",
         line_width=0,
     )
 
@@ -66,7 +70,7 @@ def create_occupancy_timeline(
         y=[capacity, capacity],
         mode='lines',
         name=f'Capacity ({capacity})',
-        line=dict(color=AMBER, width=2, dash='dash'),
+        line=dict(color=WARNING, width=2, dash='dash'),
         hoverinfo='skip',
     ))
 
@@ -102,8 +106,8 @@ def create_occupancy_timeline(
         arrowcolor='#ffffff',
         ax=0,
         ay=-32,
-        bgcolor='#192438',
-        bordercolor='#7157E8',
+        bgcolor=SURFACE_BG,
+        bordercolor=PRIMARY,
         borderwidth=1.5,
         borderpad=4,
         font=dict(color='#ffffff', size=11, family='Inter, system-ui'),
@@ -288,11 +292,11 @@ def create_density_heatmap_fig(density_matrix: Optional[np.ndarray] = None) -> g
     fig.add_trace(go.Heatmap(
         z=density_matrix,
         colorscale=[
-            [0.0, '#0E1525'],
-            [0.25, '#1B2A4A'],
-            [0.5, '#7157E8'],
-            [0.75, '#32C5F4'],
-            [1.0, '#F36B78'],
+            [0.0, '#171A18'],
+            [0.25, '#292E2A'],
+            [0.5, '#087F5B'],
+            [0.75, '#B87345'],
+            [1.0, '#D9A441'],
         ],
         colorbar=dict(
             title=dict(text="Density (heads/m²)", font=dict(size=10, color=TEXT_SECONDARY)),

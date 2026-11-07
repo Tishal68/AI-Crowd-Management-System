@@ -7,14 +7,14 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
   font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  color: #EDF2FA;
-  background: #0E1525;
+  color: #F2F0E8;
+  background: #171A18;
   overflow: hidden;
 }
 .canvas-wrapper {
   position: relative;
   width: 100%;
-  background: #090e1a;
+  background: #171A18;
   border-radius: 8px 8px 0 0;
   overflow: hidden;
   display: flex;
@@ -34,15 +34,15 @@ canvas {
   gap: 8px;
   flex-wrap: wrap;
   padding: 8px 12px;
-  background: #111B2D;
-  border: 1px solid #35445C;
+  background: #202522;
+  border: 1px solid #454B43;
   border-top: none;
   border-radius: 0 0 8px 8px;
 }
 button {
-  background: #192438;
-  border: 1px solid #35445C;
-  color: #EDF2FA;
+  background: #292E2A;
+  border: 1px solid #454B43;
+  color: #F2F0E8;
   padding: 6px 13px;
   border-radius: 6px;
   font-size: 12px;
@@ -55,18 +55,18 @@ button {
   user-select: none;
 }
 button:hover {
-  background: #202D42;
-  border-color: #4a5d7c;
+  background: #343B35;
+  border-color: #565E54;
   color: #ffffff;
 }
 button.active {
-  background: #7157E8 !important;
-  border-color: #8f79f5 !important;
+  background: #087F5B !important;
+  border-color: #10986e !important;
   color: #ffffff !important;
-  box-shadow: 0 2px 8px rgba(113, 87, 232, 0.4);
+  box-shadow: 0 2px 8px rgba(8, 127, 91, 0.4);
 }
 button:focus-visible {
-  outline: 2px solid #7157E8;
+  outline: 2px solid #087F5B;
   outline-offset: 1px;
 }
 .icon {
@@ -76,7 +76,7 @@ button:focus-visible {
 .status-hint {
   margin-left: auto;
   font-size: 11px;
-  color: #A1AEC2;
+  color: #B6B8AE;
   white-space: nowrap;
 }
 </style>
@@ -91,7 +91,7 @@ button:focus-visible {
   <button id="undo"><span class="icon">↺</span> Undo</button>
   <button id="reset"><span class="icon">⟲</span> Reset</button>
   <button id="fullframe"><span class="icon">⛶</span> Full Frame</button>
-  <button id="apply" style="background:#202D42;border-color:#32C5F4;color:#32C5F4;"><span class="icon">✓</span> Apply Area & Line</button>
+  <button id="apply" style="background:#343B35;border-color:#087F5B;color:#087F5B;"><span class="icon">✓</span> Apply Area & Line</button>
   <span id="message" class="status-hint">Full frame selected</span>
 </div>
 
@@ -129,8 +129,8 @@ function draw() {
 
   // Draw ROI polygon
   let zone = points.length ? points : [[0, 0], [1, 0], [1, 1], [0, 1]];
-  ctx.strokeStyle = '#32C5F4';
-  ctx.fillStyle = 'rgba(50, 197, 244, 0.18)';
+  ctx.strokeStyle = '#087F5B';
+  ctx.fillStyle = 'rgba(8, 127, 91, 0.22)';
   ctx.lineWidth = Math.max(2, Math.round(canvas.width / 500));
   ctx.beginPath();
   zone.forEach((p, i) => {
@@ -150,7 +150,7 @@ function draw() {
     let px = p[0] * canvas.width;
     let py = p[1] * canvas.height;
     ctx.fillStyle = '#ffffff';
-    ctx.strokeStyle = '#32C5F4';
+    ctx.strokeStyle = '#087F5B';
     ctx.lineWidth = 2.5;
     ctx.beginPath();
     ctx.arc(px, py, 6, 0, Math.PI * 2);
@@ -160,8 +160,8 @@ function draw() {
 
   // Draw Flow Line (warm amber arrow)
   if (line.length) {
-    ctx.strokeStyle = '#F5B942';
-    ctx.fillStyle = '#F5B942';
+    ctx.strokeStyle = '#D9A441';
+    ctx.fillStyle = '#D9A441';
     ctx.lineWidth = Math.max(2.5, Math.round(canvas.width / 450));
     ctx.beginPath();
     ctx.moveTo(line[0][0] * canvas.width, line[0][1] * canvas.height);

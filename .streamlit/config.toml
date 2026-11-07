@@ -3,10 +3,10 @@ maxUploadSize = 50000
 
 [theme]
 base = "dark"
-primaryColor = "#7157E8"
-backgroundColor = "#0E1525"
-secondaryBackgroundColor = "#111B2D"
-textColor = "#EDF2FA"
+primaryColor = "#087F5B"
+backgroundColor = "#171A18"
+secondaryBackgroundColor = "#202522"
+textColor = "#F2F0E8"
 font = "sans serif"
 
 [client]

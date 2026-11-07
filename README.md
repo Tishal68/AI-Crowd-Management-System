@@ -1,18 +1,40 @@
-# CrowdVision Campus — occupancy and flow review
+# CrowdVision AI — Campus Crowd Intelligence & Monitoring
 
-**Primary workspace:** a modern, full-width React/FastAPI campus operations platform featuring four unified sections: **Review Footage** (with inline Footage Settings for default capacity, buildup duration, sampling FPS, confidence threshold, and output resolution), **Live Monitoring** (with verified backend RTSP/camera stream testing and honest connection state), **Activity & History** (complete session inventory, search, and filtering), and **Reports** (centralized PDF inspection certificates, telemetry CSVs, and annotated media exports). It supports up to five named counting zones, a detection-frequency heatmap, synchronized video and single-image review, streaming chunk uploads without arbitrary 200 MB restrictions, and deployment-aware processing (local machine or application server). See [web setup and Render deployment](docs/WEB_WORKSPACE.md). The Streamlit instructions below remain for the preserved legacy app and experimental flow tracking.
+**Primary & Official Application Entry Point:** CrowdVision is an AI-powered campus crowd monitoring and spatial analytics platform built with Streamlit (`streamlit run app.py`). It features real-time and recorded video/image crowd analysis, YOLO11-based people/head detection, interactive convex counting polygons, directional tripwire flow analysis, sustained capacity exceedance detection, spatial density heatmaps, and formal compliance PDF audit reports.
 
-Help a campus event team review recorded entrances and gathering areas: draw the area being monitored, set its capacity, identify sustained exceedances, and jump to the relevant moments. The project combines head detection with sampled occupancy, experimental directional crossings, compact H.264 evidence and timestamped reports. It is an academic prototype; it does not predict stampedes or establish that a venue is safe.
+The interface is engineered with a modern enterprise visual identity:
+- **Charcoal backgrounds:** Soft charcoal (`#171A18`), deep charcoal (`#202522`), and stone black cards (`#292E2A`).
+- **Deep emerald primary accents:** Active navigation, primary actions, and timeline curves (`#087F5B`).
+- **Warm copper secondary accents:** Turnstile flow markers and secondary highlights (`#B87345`).
+- **Warm amber highlights:** Exceedance alerts and detection heatmaps (`#D9A441`).
 
-## Windows setup
+All video decoding, YOLO11 inference, and tracking run 100% locally on your machine with zero external network transmission.
 
-Use Python 3.12 and Node.js 22 for the primary web workspace.
+---
+
+## Quick Start (Primary Streamlit Application)
+
+Requires Python 3.12:
 
 ```powershell
 cd AI-Crowd-Management-System
 py -3.12 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install torch==2.13.0 torchvision==0.28.0 --index-url https://download.pytorch.org/whl/cpu
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\streamlit.exe run app.py
+```
+
+Open **http://localhost:8501** in your browser. Stop with `Ctrl+C` in the terminal. No external API keys or cloud services are required.
+
+---
+
+## Optional Web Workspace (React + FastAPI)
+
+The repository also includes an isolated, optional web workspace built with React, TypeScript, and FastAPI for headless or containerized multi-zone deployments. It is completely independent and not required for running the primary Streamlit application.
+
+To launch the optional web workspace:
+
+```powershell
 cd frontend
 npm ci
 npm run build
@@ -21,17 +43,7 @@ $env:CROWD_DEV_AUTH='1'
 .\.venv\Scripts\python.exe -m uvicorn server.app:app --host 127.0.0.1 --port 8080
 ```
 
-Open http://127.0.0.1:8080. The development authentication bypass is restricted to loopback connections. Stop with Ctrl+C. Dependencies are pinned in `requirements.txt`, `constraints.txt` and `frontend/package-lock.json`. See [web setup, privacy controls and Render deployment](docs/WEB_WORKSPACE.md) for password-protected hosting.
-
-## Legacy Streamlit app
-
-The preserved local interface provides image analysis, historical Streamlit sessions and experimental directional flow. After installing the Python dependencies above, run:
-
-```powershell
-.\.venv\Scripts\python.exe -m streamlit run app.py
-```
-
-Open http://localhost:8501. Stop with Ctrl+C in the terminal. No API keys are required. `imageio-ffmpeg` supplies an encoder if FFmpeg is not installed on PATH. Video compression uses libx264; no uncompressed intermediate video is saved. The following workflow and local storage instructions describe this legacy interface.
+Open **http://127.0.0.1:8080**.
 
 The included default model is `models/head_detector.pt`, a single-class YOLO11m head detector. Select another trusted checkpoint in the sidebar or set `CROWD_MODEL_PATH` before launch. The model must include a head/person class; unrelated classes are rejected. See [model provenance and historical metric limitations](docs/MODEL_CARD.md).
 
