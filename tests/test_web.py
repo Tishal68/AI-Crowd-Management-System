@@ -115,6 +115,13 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(css_res.status_code, 200)
         self.assertIn('cv-footage-settings-dropdown', css_res.text)
         self.assertNotIn('cv-settings-popover', css_res.text)
+        self.assertNotIn('#7657e8', css_res.text.lower())
+        self.assertNotIn('#28c4e8', css_res.text.lower())
+        self.assertIn('#087f5b', css_res.text.lower())
+        self.assertIn('#b87345', css_res.text.lower())
+        self.assertIn('#171a18', css_res.text.lower())
+        self.assertNotIn('Purple: observed heads', js_res.text)
+        self.assertIn('Emerald: observed heads', js_res.text)
     def test_busy_worker_and_immutable_result_and_cancel(self):
         self.login();key='a'*32;path=self.sessions/key;path.mkdir()
         atomic_json(path/'metadata.json',dict(created=1,file_name='clip.mp4',source='source.mp4'))

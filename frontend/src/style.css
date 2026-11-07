@@ -1,21 +1,23 @@
 :root {
-  --bg: #0B1220;
-  --header-bg: #101A2D;
-  --surface-main: #141F33;
-  --surface-elevated: #1A2942;
-  --surface-hover: #223554;
-  --border: #2B3B56;
-  --border-light: #374A6B;
-  --purple: #7657E8;
-  --purple-hover: #6444d9;
-  --purple-glow: rgba(118, 87, 232, 0.4);
-  --cyan: #28C4E8;
-  --success: #32D49A;
-  --warning: #F4B942;
-  --critical: #F16C78;
-  --text-primary: #ECF1FA;
-  --text-secondary: #9EADC3;
-  --text-muted: #6B7B95;
+  --bg: #171A18;
+  --header-bg: #202522;
+  --surface-main: #292E2A;
+  --surface-elevated: #343B35;
+  --surface-hover: #3E463F;
+  --border: #454B43;
+  --border-light: #565E54;
+  --primary: #087F5B;
+  --primary-hover: #099268;
+  --primary-glow: rgba(8, 127, 91, 0.35);
+  --secondary: #B87345;
+  --secondary-hover: #C98354;
+  --amber: #D9A441;
+  --success: #3D9970;
+  --warning: #D98236;
+  --critical: #C65D62;
+  --text-primary: #F2F0E8;
+  --text-secondary: #B6B8AE;
+  --text-muted: #8B8E85;
   font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   color: var(--text-primary);
   background: var(--bg);
@@ -74,18 +76,18 @@ a:focus-visible,
 summary:focus-visible,
 input:focus-visible,
 select:focus-visible {
-  outline: 2px solid var(--purple);
+  outline: 2px solid var(--primary);
   outline-offset: 2px;
 }
 
 a {
-  color: var(--cyan);
+  color: var(--secondary);
   text-decoration: none;
   transition: color 0.15s ease;
 }
 
 a:hover {
-  color: #5be0ff;
+  color: var(--secondary-hover);
 }
 
 h1, h2, h3, h4, p {
@@ -131,21 +133,21 @@ svg {
   flex-shrink: 0;
 }
 
-/* Primary Purple Buttons */
+/* Primary Buttons */
 .primary,
 .file-button,
 .cv-btn-primary {
-  background: var(--purple) !important;
+  background: var(--primary) !important;
   color: #ffffff !important;
-  border: 1px solid #8e73fa !important;
-  box-shadow: 0 2px 8px var(--purple-glow);
+  border: 1px solid #10986e !important;
+  box-shadow: 0 2px 8px var(--primary-glow);
 }
 
 .primary:hover,
 .file-button:hover,
 .cv-btn-primary:hover {
-  background: var(--purple-hover) !important;
-  box-shadow: 0 4px 12px var(--purple-glow);
+  background: var(--primary-hover) !important;
+  box-shadow: 0 4px 12px var(--primary-glow);
 }
 
 .cv-btn-secondary {
@@ -160,13 +162,13 @@ svg {
 }
 
 .cv-btn-danger {
-  background: rgba(241, 108, 120, 0.15);
-  border: 1px solid rgba(241, 108, 120, 0.4);
+  background: rgba(198, 93, 98, 0.15);
+  border: 1px solid rgba(198, 93, 98, 0.4);
   color: var(--critical);
 }
 
 .cv-btn-danger:hover {
-  background: rgba(241, 108, 120, 0.25);
+  background: rgba(198, 93, 98, 0.25);
   border-color: var(--critical);
 }
 
@@ -174,12 +176,12 @@ svg {
   border: 0;
   background: transparent;
   padding: 4px 0;
-  color: var(--cyan);
+  color: var(--secondary);
   font-weight: 500;
 }
 
 .link:hover {
-  color: #7ce8ff;
+  color: var(--secondary-hover);
   background: transparent;
 }
 
@@ -221,12 +223,12 @@ svg {
   width: 36px;
   height: 36px;
   border-radius: 9px;
-  background: linear-gradient(135deg, var(--purple) 0%, var(--cyan) 100%);
+  background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
   display: flex;
   align-items: center;
   justify-content: center;
   color: #ffffff;
-  box-shadow: 0 3px 10px var(--purple-glow);
+  box-shadow: 0 3px 10px var(--primary-glow);
 }
 
 .cv-brand-text {
@@ -258,14 +260,14 @@ svg {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: var(--purple);
+  background: var(--primary);
   color: #ffffff;
-  border: 1px solid #8e73fa;
+  border: 1px solid #10986e;
   padding: 6px 18px;
   border-radius: 7px;
   font-weight: 600;
   font-size: 13.5px;
-  box-shadow: 0 2px 10px var(--purple-glow);
+  box-shadow: 0 2px 10px var(--primary-glow);
 }
 
 .cv-header-right {
@@ -290,8 +292,8 @@ svg {
 }
 
 .cv-signout-btn:hover {
-  background: rgba(241, 108, 120, 0.12);
-  border-color: rgba(241, 108, 120, 0.4);
+  background: rgba(198, 93, 98, 0.12);
+  border-color: rgba(198, 93, 98, 0.4);
   color: var(--critical);
 }
 
@@ -333,11 +335,11 @@ svg {
 }
 
 .cv-subnav-btn.active {
-  background: var(--purple);
+  background: var(--primary);
   color: #ffffff;
   font-weight: 600;
-  border-color: #8e73fa;
-  box-shadow: 0 2px 8px var(--purple-glow);
+  border-color: #10986e;
+  box-shadow: 0 2px 8px var(--primary-glow);
 }
 
 /* =========================================================
@@ -375,7 +377,7 @@ svg {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--purple);
+  color: var(--primary);
   flex-shrink: 0;
   margin-top: 2px;
 }
@@ -408,7 +410,7 @@ svg {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--purple);
+  color: var(--primary);
   font-size: 18px;
   flex-shrink: 0;
 }
@@ -429,7 +431,7 @@ svg {
 /* Dashed Dropzone */
 .cv-dropzone {
   border: 1.5px dashed var(--border-light);
-  background: #0B1220;
+  background: var(--bg);
   border-radius: 10px;
   padding: 36px 20px;
   text-align: center;
@@ -443,12 +445,12 @@ svg {
 
 .cv-dropzone:hover,
 .cv-dropzone.dragover {
-  border-color: var(--purple);
-  background: #0e1729;
+  border-color: var(--primary);
+  background: var(--surface-elevated);
 }
 
 .cv-dropzone-cloud {
-  color: var(--purple);
+  color: var(--primary);
   margin-bottom: 12px;
 }
 
@@ -469,21 +471,21 @@ svg {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: var(--purple);
+  background: var(--primary);
   color: #ffffff;
-  border: 1px solid #8e73fa;
+  border: 1px solid #10986e;
   border-radius: 6px;
   padding: 7px 22px;
   font-weight: 600;
   font-size: 13px;
   cursor: pointer;
-  box-shadow: 0 2px 8px var(--purple-glow);
+  box-shadow: 0 2px 8px var(--primary-glow);
   transition: all 0.15s ease;
 }
 
 .cv-browse-btn:hover {
-  background: var(--purple-hover);
-  box-shadow: 0 4px 12px var(--purple-glow);
+  background: var(--primary-hover);
+  box-shadow: 0 4px 12px var(--primary-glow);
 }
 
 .cv-upload-progress-wrap {
@@ -505,7 +507,7 @@ svg {
 
 .cv-progress-bar-fill {
   height: 100%;
-  background: var(--purple);
+  background: var(--primary);
   transition: width 0.2s ease;
 }
 
@@ -565,7 +567,7 @@ svg {
 }
 
 .cv-capabilities-header svg {
-  color: var(--purple);
+  color: var(--primary);
 }
 
 .cv-capabilities-grid {
@@ -595,8 +597,10 @@ svg {
   margin-bottom: 10px;
 }
 
-.cv-cap-icon.purple { color: var(--purple); }
-.cv-cap-icon.cyan { color: var(--cyan); }
+.cv-cap-icon.purple,
+.cv-cap-icon.emerald { color: var(--primary); }
+.cv-cap-icon.cyan,
+.cv-cap-icon.copper { color: var(--secondary); }
 .cv-cap-icon.amber { color: var(--warning); }
 
 .cv-capability-card h4 {
@@ -651,29 +655,29 @@ svg {
 }
 
 .badge.ready {
-  background: rgba(40, 196, 232, 0.15);
-  color: var(--cyan);
-  border: 1px solid rgba(40, 196, 232, 0.35);
+  background: rgba(184, 115, 69, 0.15);
+  color: var(--secondary);
+  border: 1px solid rgba(184, 115, 69, 0.35);
 }
 
 .badge.running,
 .badge.queued {
-  background: rgba(118, 87, 232, 0.15);
-  color: var(--purple);
-  border: 1px solid rgba(118, 87, 232, 0.35);
+  background: rgba(8, 127, 91, 0.15);
+  color: var(--primary);
+  border: 1px solid rgba(8, 127, 91, 0.35);
 }
 
 .badge.complete {
-  background: rgba(50, 212, 154, 0.15);
+  background: rgba(61, 153, 112, 0.15);
   color: var(--success);
-  border: 1px solid rgba(50, 212, 154, 0.35);
+  border: 1px solid rgba(61, 153, 112, 0.35);
 }
 
 .badge.failed,
 .badge.cancelled {
-  background: rgba(241, 108, 120, 0.15);
+  background: rgba(198, 93, 98, 0.15);
   color: var(--critical);
-  border: 1px solid rgba(241, 108, 120, 0.35);
+  border: 1px solid rgba(198, 93, 98, 0.35);
 }
 
 /* 2-Column Workspace Layout */
@@ -720,14 +724,14 @@ svg {
 }
 
 .zone-active {
-  fill: rgba(118, 87, 232, 0.35);
-  stroke: var(--purple);
+  fill: rgba(8, 127, 91, 0.35);
+  stroke: var(--primary);
   stroke-width: 0.8;
 }
 
 .zone-other {
-  fill: rgba(40, 196, 232, 0.2);
-  stroke: var(--cyan);
+  fill: rgba(184, 115, 69, 0.2);
+  stroke: var(--secondary);
   stroke-width: 0.5;
 }
 
@@ -735,7 +739,7 @@ svg {
   position: absolute;
   top: 10px;
   left: 10px;
-  background: rgba(16, 26, 45, 0.85);
+  background: rgba(32, 37, 34, 0.9);
   border: 1px solid var(--border);
   color: var(--text-primary);
   padding: 4px 10px;
@@ -793,9 +797,9 @@ svg {
 }
 
 .zone-tabs button.chosen {
-  background: var(--purple);
+  background: var(--primary);
   color: #fff;
-  border-color: #8e73fa;
+  border-color: #10986e;
 }
 
 .start-bar {
@@ -852,7 +856,7 @@ progress::-webkit-progress-bar {
 }
 
 progress::-webkit-progress-value {
-  background: var(--purple);
+  background: var(--primary);
 }
 
 /* Results layout */
@@ -906,7 +910,7 @@ progress::-webkit-progress-value {
 
 .export a:hover {
   background: var(--surface-elevated);
-  color: var(--cyan);
+  color: var(--secondary);
 }
 
 .stats {
@@ -1001,7 +1005,7 @@ progress::-webkit-progress-value {
 
 .scrubber {
   width: 100%;
-  accent-color: var(--purple);
+  accent-color: var(--primary);
   margin-top: 6px;
 }
 
@@ -1024,8 +1028,8 @@ progress::-webkit-progress-value {
 }
 
 .event.event-selected {
-  border-color: var(--purple);
-  background: rgba(118, 87, 232, 0.15);
+  border-color: var(--primary);
+  background: rgba(8, 127, 91, 0.15);
 }
 
 .event-top {
@@ -1195,7 +1199,7 @@ progress::-webkit-progress-value {
 
 .cv-export-link:hover {
   background: var(--surface-hover);
-  color: var(--cyan);
+  color: var(--secondary);
   border-color: var(--border-light);
 }
 
@@ -1231,7 +1235,7 @@ progress::-webkit-progress-value {
 
 .cv-live-rec-badge {
   display: inline-block;
-  background: rgba(241, 108, 120, 0.2);
+  background: rgba(198, 93, 98, 0.2);
   color: var(--critical);
   border: 1px solid var(--critical);
   border-radius: 4px;
@@ -1290,8 +1294,8 @@ progress::-webkit-progress-value {
 }
 
 .error {
-  background: rgba(241, 108, 120, 0.15);
-  border: 1px solid rgba(241, 108, 120, 0.35);
+  background: rgba(198, 93, 98, 0.15);
+  border: 1px solid rgba(198, 93, 98, 0.35);
   color: var(--critical);
   border-radius: 6px;
   padding: 10px 14px;
@@ -1312,7 +1316,7 @@ progress::-webkit-progress-value {
 }
 
 .empty svg {
-  color: var(--purple);
+  color: var(--primary);
   margin-bottom: 12px;
 }
 
@@ -1375,7 +1379,7 @@ progress::-webkit-progress-value {
 .cv-footage-settings-btn:hover,
 .cv-footage-settings-btn.active {
   background: var(--surface-elevated);
-  border-color: var(--purple);
+  border-color: var(--primary);
   color: var(--text-primary);
 }
 
@@ -1396,7 +1400,7 @@ progress::-webkit-progress-value {
   border: 1px solid var(--border-light);
   border-radius: 10px;
   padding: 16px;
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.65), 0 0 1px rgba(118, 87, 232, 0.4);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.65), 0 0 1px rgba(8, 127, 91, 0.4);
   z-index: 250;
   animation: cvFadeIn 0.15s ease;
 }
@@ -1451,7 +1455,7 @@ progress::-webkit-progress-value {
 
 .cv-fs-body input:focus,
 .cv-fs-body select:focus {
-  border-color: var(--purple);
+  border-color: var(--primary);
   outline: none;
 }
 
@@ -1476,6 +1480,6 @@ progress::-webkit-progress-value {
   max-height: 580px;
   object-fit: contain;
   border-radius: 8px;
-  background: #060a12;
+  background: var(--bg);
   display: block;
 }

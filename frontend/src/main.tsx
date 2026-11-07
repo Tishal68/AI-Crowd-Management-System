@@ -780,7 +780,7 @@ function App() {
 
                 <div className="cv-capabilities-grid">
                   <div className="cv-capability-card">
-                    <div className="cv-cap-icon purple">
+                    <div className="cv-cap-icon emerald">
                       <Users size={22} />
                     </div>
                     <h4>Crowd Detection & Occupancy</h4>
@@ -788,7 +788,7 @@ function App() {
                   </div>
 
                   <div className="cv-capability-card">
-                    <div className="cv-cap-icon cyan">
+                    <div className="cv-cap-icon copper">
                       <Activity size={22} />
                     </div>
                     <h4>Directional Flow Analysis</h4>
@@ -1060,7 +1060,7 @@ function App() {
                       <small>
                         Resolution: {cameraCheck.width}×{cameraCheck.height} · Framerate: {cameraCheck.fps} FPS
                       </small>
-                      <p style={{ marginTop: 8, fontSize: 12, color: "var(--cyan)" }}>
+                      <p style={{ marginTop: 8, fontSize: 12, color: "var(--secondary)" }}>
                         Active zone: {liveLocation} · Threshold: {liveCapacity} heads
                       </p>
                     </div>
@@ -1413,8 +1413,8 @@ function ZoneEditor({
                 points={points
                   .map((p) => p.map((v) => v * 100).join(","))
                   .join(" ")}
-                fill="rgba(118, 87, 232, 0.25)"
-                stroke="#7657E8"
+                fill="rgba(8, 127, 91, 0.25)"
+                stroke="#087F5B"
                 strokeWidth=".6"
               />
             )}
@@ -1424,7 +1424,7 @@ function ZoneEditor({
                 cx={p[0] * 100}
                 cy={p[1] * 100}
                 r=".8"
-                fill="#7657E8"
+                fill="#087F5B"
               />
             ))}
           </svg>
@@ -1763,7 +1763,7 @@ function Results({ session }: { session: Session }) {
                         y={y}
                         width="1"
                         height="1"
-                        fill="#ffb020"
+                        fill="#D9A441"
                         opacity={0.12 + (0.7 * v) / heatmax}
                       />
                     ) : null,
@@ -1774,7 +1774,7 @@ function Results({ session }: { session: Session }) {
           </div>
           {heat && (
             <p className="hint heat-legend" style={{ marginTop: 6 }}>
-              Low <span style={{ display: "inline-block", width: 40, height: 6, background: "linear-gradient(90deg, #ffb02022, #ffb020)" }} /> High · Relative detection frequency across{" "}
+              Low <span style={{ display: "inline-block", width: 40, height: 6, background: "linear-gradient(90deg, rgba(217, 164, 65, 0.15), #D9A441)" }} /> High · Relative detection frequency across{" "}
               {r.heatmap.samples} samples. Not physical density or unique
               people.
             </p>
@@ -1815,7 +1815,7 @@ function Results({ session }: { session: Session }) {
               }}
             >
               {[0, 50, 100, 149].map((y) => (
-                <line key={y} x1="0" x2="800" y1={y} y2={y} stroke="#2B3B56" />
+                <line key={y} x1="0" x2="800" y1={y} y2={y} stroke="#454B43" />
               ))}
               {events.map((e, i) => (
                 <rect
@@ -1824,7 +1824,7 @@ function Results({ session }: { session: Session }) {
                   y="0"
                   width={Math.max(2, (e.duration_seconds / duration) * 800)}
                   height="150"
-                  fill="rgba(244, 185, 66, 0.2)"
+                  fill="rgba(217, 164, 65, 0.25)"
                 />
               ))}
               {zone >= 0 && (
@@ -1833,13 +1833,13 @@ function Results({ session }: { session: Session }) {
                   x2="800"
                   y1={145 - (r.zones[zone].capacity / max) * 135}
                   y2={145 - (r.zones[zone].capacity / max) * 135}
-                  stroke="#F4B942"
+                  stroke="#D98236"
                   strokeDasharray="5 5"
                 />
               )}
               <polyline
                 fill="none"
-                stroke="#7657E8"
+                stroke="#087F5B"
                 strokeWidth="2.5"
                 points={times
                   .map(
@@ -1853,7 +1853,7 @@ function Results({ session }: { session: Session }) {
                 x2={(time / duration) * 800}
                 y1="0"
                 y2="150"
-                stroke="#28C4E8"
+                stroke="#B87345"
                 strokeWidth="2"
               />
             </svg>
@@ -1873,7 +1873,7 @@ function Results({ session }: { session: Session }) {
               {fmt(time)} / {fmt(duration)}
             </span>
             <span>
-              Purple: observed heads · Amber: buildup events
+              Emerald: observed heads · Amber: buildup events
               {zone >= 0 ? " · Dashed: capacity" : ""}
             </span>
           </div>
