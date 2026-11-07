@@ -260,6 +260,8 @@ class Settings(BaseModel):
     analysis_fps: float = Field(default=5, ge=1, le=10)
     event_seconds: float = Field(default=3, ge=1, le=60)
     imgsz: int = Field(default=640, ge=320, le=640)
+    max_width: int = Field(default=0, ge=0, le=1920)
+    smooth_playback: bool = Field(default=True)
 
 
 def execute(path):
@@ -289,7 +291,7 @@ def start(key: str, body: Settings):
         except ValueError as exc:
             raise HTTPException(507, str(exc))
         settings = body.model_dump()
-        settings.update(weights_path=config.BEST_WEIGHTS_PATH, max_capacity=sum(z['capacity'] for z in spatial.zones), roi_polygon=None, flow_line=None, max_width=960)
+        settings.update(weights_path=config.BEST_WEIGHTS_PATH, max_capacity=sum(z['capacity'] for z in spatial.zones), roi_polygon=None, flow_line=None, max_width=body.max_width, smooth_playback=body.smooth_playback)
         meta = read(path/'metadata.json')
         atomic_json(path/'job.json', dict(settings=settings, source_path=str(path/meta['source']), file_name=meta['file_name'], media_type='video'))
         (path/'cancel').unlink(missing_ok=True)

@@ -3,8 +3,11 @@ maxUploadSize = 200
 
 [theme]
 base = "dark"
-primaryColor = "#6dc6df"
-backgroundColor = "#0c111b"
-secondaryBackgroundColor = "#151e2d"
-textColor = "#e8edf6"
+primaryColor = "#7157E8"
+backgroundColor = "#0E1525"
+secondaryBackgroundColor = "#111B2D"
+textColor = "#EDF2FA"
 font = "sans serif"
+
+[client]
+toolbarMode = "minimal"

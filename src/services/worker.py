@@ -47,7 +47,7 @@ def run(run_dir, preloaded_model=None):
                                      output_path=str(output),analysis_fps=settings['analysis_fps'],
                                      max_width=settings['max_width'],flow_line=settings.get('flow_line'),
                                      event_seconds=settings['event_seconds'],frame_callback=progress,cancel_check=cancelled,
-                                     zones=settings.get('zones'))
+                                     zones=settings.get('zones'),smooth_playback=settings.get('smooth_playback',True))
                 data=asdict(result)
                 data['per_frame_levels']=[get_crowd_level(n,settings['max_capacity']) for n in result.per_frame_counts]
                 cap=cv2.VideoCapture(str(output))

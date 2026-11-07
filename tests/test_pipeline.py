@@ -1,4 +1,4 @@
-"""Regression tests for size control, timekeeping, failure handling and report consistency."""
+"""Regression tests for size control, timekeeping, failure handling, smooth playback, and RTSP stream support."""
 import csv
 import io
 import tempfile
@@ -9,6 +9,7 @@ import cv2
 import numpy as np
 from src.core.video_processor import process_video
 from src.core.encoding import ffmpeg_executable, CompactVideoWriter
+from src.core.stream_reader import is_stream_url, normalize_stream_source
 from src.utils.helpers import Detection, BoxSmoother, resolve_class_ids, get_crowd_level
 from src.utils.privacy import redact_sensitive
 from src.services.storage import atomic_json, clear_session, retain_run, clear_legacy_exports
@@ -29,8 +30,10 @@ class PipelineTests(unittest.TestCase):
             cv2.rectangle(frame,(i*3,30),(i*3+40,100),(255,160,50),-1)
             writer.write(frame)
         writer.release()
+
     def tearDown(self):
         self.temp.cleanup()
+
     def test_output_width_does_not_change_detection_input(self):
         shapes = []
         def detect(model, frame, **kwargs):
@@ -57,6 +60,42 @@ class PipelineTests(unittest.TestCase):
         self.assertAlmostEqual(cap.get(cv2.CAP_PROP_FRAME_COUNT)/5,2,places=2)
         cap.release()
         self.assertFalse(list(self.root.glob('*.partial.mp4')))
+
+    def test_smooth_playback_preserves_source_fps_and_frame_count(self):
+        output=self.root/'smooth.mp4'
+        with patch('src.core.video_processor.detect_heads_in_frame',return_value=[Detection(10,10,25,25,.9)]):
+            result=process_video('unused',str(self.source),preloaded_model=DummyModel(),
+                                 output_path=str(output),analysis_fps=5,max_width=160,smooth_playback=True)
+        self.assertEqual(result.source_fps,30)
+        self.assertEqual(result.output_width,160)
+        cap=cv2.VideoCapture(str(output))
+        self.assertTrue(cap.isOpened())
+        self.assertAlmostEqual(cap.get(cv2.CAP_PROP_FPS),30,places=2)
+        self.assertAlmostEqual(cap.get(cv2.CAP_PROP_FRAME_COUNT),60,delta=2)
+        cap.release()
+
+    def test_native_resolution_export_preserves_dimensions(self):
+        output=self.root/'native.mp4'
+        with patch('src.core.video_processor.detect_heads_in_frame',return_value=[]):
+            result=process_video('unused',str(self.source),preloaded_model=DummyModel(),
+                                 output_path=str(output),max_width=0,smooth_playback=False)
+        self.assertEqual(result.output_width,320)
+        self.assertEqual(result.output_height,240)
+
+    def test_rtsp_stream_url_detection(self):
+        self.assertTrue(is_stream_url('rtsp://admin:12345@192.168.1.100:554/live'))
+        self.assertTrue(is_stream_url('rtsps://camera.campus.edu:322/h264'))
+        self.assertTrue(is_stream_url('http://192.168.1.50:8080/video.mjpg'))
+        self.assertTrue(is_stream_url('https://stream.example.com/live.m3u8'))
+        self.assertTrue(is_stream_url('0'))
+        self.assertTrue(is_stream_url(0))
+        self.assertTrue(is_stream_url(1))
+        self.assertFalse(is_stream_url('recording.mp4'))
+        self.assertFalse(is_stream_url('C:/videos/crowd.avi'))
+        self.assertEqual(normalize_stream_source('0'), 0)
+        self.assertEqual(normalize_stream_source(' 1 '), 1)
+        self.assertEqual(normalize_stream_source('rtsp://cam/1'), 'rtsp://cam/1')
+
     def test_failure_is_not_safe_and_partial_output_removed(self):
         output=self.root/'bad.mp4'
         with patch('src.core.video_processor.detect_heads_in_frame',side_effect=RuntimeError('failure')):
@@ -64,19 +103,23 @@ class PipelineTests(unittest.TestCase):
                 process_video('unused',str(self.source),preloaded_model=DummyModel(),output_path=str(output))
         self.assertFalse(output.exists())
         self.assertFalse(list(self.root.glob('*.partial.mp4')))
+
     def test_untracked_smoothing_does_not_move_boxes(self):
         smoother=BoxSmoother()
         smoother.smooth([Detection(0,0,10,10,.9),Detection(100,0,110,10,.9)])
         result=smoother.smooth([Detection(100,0,110,10,.9),Detection(0,0,10,10,.9)])
         self.assertEqual([(d.x1,d.x2) for d in result],[(100,110),(0,10)])
+
     def test_unknown_class_is_rejected(self):
         with self.assertRaises(ValueError):
             resolve_class_ids({0:'chair'},('head','person'))
+
     def test_credentials_are_redacted_recursively(self):
         record={'file_name':'rtsp://user:password@camera:554/stream?token=abc','settings':{'password':'secret'}}
         clean=redact_sensitive(record)
         self.assertNotIn('user:',str(clean)); self.assertNotIn('abc',str(clean))
         self.assertEqual(clean['settings']['password'],'[redacted]')
+
     def test_atomic_run_storage_and_pruning(self):
         for key in ['a'*24,'b'*24]:
             atomic_json(self.root/key/'result.json',{'value':1})
@@ -86,12 +129,14 @@ class PipelineTests(unittest.TestCase):
         self.assertTrue(unrelated.exists())
         with self.assertRaises(ValueError):
             clear_session(self.root,'../escape')
+
     def test_report_handles_user_filename_and_records_peak(self):
         output=self.root/'report.pdf'
         generate_pdf_report({'file_name':'<crowd & test>.mp4','max_head_count':12,'avg_head_count':4,
                              'final_head_count':1,'peak_crowd_level':'High Crowd','final_crowd_level':'Low Crowd',
                              'model_name':'yolo11m','settings':{}},str(output))
         self.assertTrue(output.read_bytes().startswith(b'%PDF'))
+
     def test_input_cannot_be_overwritten(self):
         with self.assertRaises(ValueError):
             process_video('unused',str(self.source),output_path=str(self.source))
@@ -104,6 +149,7 @@ class PipelineTests(unittest.TestCase):
             writer.close()
         self.assertFalse(path.exists())
         self.assertFalse(list(self.root.glob('*.partial.mp4')))
+
     def test_csv_uses_original_source_timestamps_and_levels(self):
         record={'per_frame_counts':[1,3], 'timestamps':[0.0,0.2],
                 'per_frame_levels':['Low Crowd','Moderate Crowd']}
@@ -113,6 +159,7 @@ class PipelineTests(unittest.TestCase):
         record['timestamps']=[]
         with self.assertRaises(ValueError):
             csv_bytes(record)
+
     def test_capacity_boundaries(self):
         self.assertEqual(get_crowd_level(60,100),'Low Crowd')
         self.assertEqual(get_crowd_level(61,100),'Moderate Crowd')
