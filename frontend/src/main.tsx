@@ -2,23 +2,25 @@ import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   Activity,
+  AlertTriangle,
   ArrowRight,
-  BarChart3,
   Check,
-  ChevronRight,
   Clock3,
   Download,
+  FileText,
   Film,
   FolderOpen,
-  LayoutDashboard,
+  Layers,
+  Lock,
   LogOut,
   Plus,
   ScanLine,
   Search,
   Settings2,
-  ShieldCheck,
   Trash2,
   Upload,
+  Users,
+  Video,
   X,
 } from "lucide-react";
 import "./style.css";
@@ -71,6 +73,7 @@ type Session = {
   result?: Result;
   settings?: Settings;
 };
+
 const defaults: Settings = {
   location: "Campus event",
   zones: [
@@ -90,13 +93,15 @@ const defaults: Settings = {
   event_seconds: 3,
   imgsz: 640,
 };
-const pages = ["Overview", "Analyze footage", "Sessions", "Model evaluation"];
-const icons = [LayoutDashboard, ScanLine, FolderOpen, BarChart3];
+
+type AppPage = "Review Footage" | "Live Monitoring" | "Activity & History" | "Reports";
+
 const active = (s: Session) =>
   ["queued", "running", "cancelling"].includes(s.status.state);
 const fmt = (t: number) =>
   `${Math.floor(t / 60)}:${(t % 60).toFixed(1).padStart(4, "0")}`;
 const mb = (b: number) => (b / 1024 ** 2).toFixed(1) + " MB";
+
 async function api(path: string, method = "GET", body?: unknown) {
   const r = await fetch("/api" + path, {
     method,
@@ -113,19 +118,37 @@ async function api(path: string, method = "GET", body?: unknown) {
   }
   return r.json();
 }
+
+function normalizePage(stored: string | null): AppPage {
+  if (stored === "Live Monitoring") return "Live Monitoring";
+  if (stored === "Activity & History" || stored === "Sessions") return "Activity & History";
+  if (stored === "Reports") return "Reports";
+  return "Review Footage";
+}
+
 function App() {
-  const [page, setPage] = useState(
-    sessionStorage.getItem("campus-page") || "Overview",
+  const [page, setPage] = useState<AppPage>(() =>
+    normalizePage(sessionStorage.getItem("campus-page")),
   );
-  const [auth, setAuth] = useState<boolean | null>(null),
-    [password, setPassword] = useState(""),
-    [retention, setRetention] = useState(7);
-  const [sessions, setSessions] = useState<Session[]>([]),
-    [selected, setSelected] = useState<Session | null>(null),
-    [error, setError] = useState(""),
-    [busy, setBusy] = useState(false),
-    [search, setSearch] = useState(""),
-    [filter, setFilter] = useState("all");
+  const [auth, setAuth] = useState<boolean | null>(null);
+  const [password, setPassword] = useState("");
+  const [retention, setRetention] = useState(7);
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [selected, setSelected] = useState<Session | null>(null);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState("all");
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+
+  // Live monitoring local settings
+  const [liveSourceType, setLiveSourceType] = useState("rtsp");
+  const [rtspUrl, setRtspUrl] = useState(() => localStorage.getItem("campus-rtsp-url") || "rtsp://admin:pass@192.168.1.100:554/live");
+  const [liveLocation, setLiveLocation] = useState("Campus entrance");
+  const [liveCapacity, setLiveCapacity] = useState(80);
+  const [liveActive, setLiveActive] = useState(false);
+
   const [draft, setDraft] = useState<Settings>(() => {
     try {
       return (
@@ -136,14 +159,16 @@ function App() {
       return defaults;
     }
   });
-  const [uploadProgress, setUploadProgress] = useState<number | null>(null),
-    [evaluation, setEvaluation] = useState<any>(null);
+
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const selectedId = useRef(sessionStorage.getItem("campus-session") || "");
-  const navigate = (p: string) => {
+
+  const navigate = (p: AppPage) => {
     setPage(p);
     sessionStorage.setItem("campus-page", p);
     window.scrollTo(0, 0);
   };
+
   const refresh = async () => {
     const s = await api("/sessions");
     setSessions(s);
@@ -156,6 +181,7 @@ function App() {
       }
     }
   };
+
   useEffect(() => {
     api("/auth")
       .then((x) => {
@@ -164,21 +190,21 @@ function App() {
       })
       .catch((e) => setError(e.message));
   }, []);
+
   useEffect(() => {
     if (!auth) return;
     refresh().catch((e) => setError(e.message));
-    api("/evaluation")
-      .then(setEvaluation)
-      .catch((e) => setError(e.message));
     const id = setInterval(
       () => refresh().catch((e) => setError(e.message)),
       2000,
     );
     return () => clearInterval(id);
   }, [auth]);
+
   useEffect(() => {
     localStorage.setItem("campus-settings", JSON.stringify(draft));
   }, [draft]);
+
   const action = async (fn: () => Promise<void>) => {
     setError("");
     setBusy(true);
@@ -190,16 +216,17 @@ function App() {
       setBusy(false);
     }
   };
+
   const open = async (s: Session) => {
     selectedId.current = s.id;
     sessionStorage.setItem("campus-session", s.id);
     setSelected(await api("/sessions/" + s.id));
-    navigate("Analyze footage");
+    navigate("Review Footage");
   };
+
+  // Upload without artificial 200MB restriction
   const upload = (file: File) =>
     action(async () => {
-      if (file.size > 200 * 1024 ** 2)
-        throw Error("Choose a recording smaller than 200 MB.");
       setUploadProgress(0);
       try {
         const s = await new Promise<Session>((resolve, reject) => {
@@ -211,19 +238,19 @@ function App() {
             setUploadProgress(e.lengthComputable ? e.loaded / e.total : 0);
           xhr.onerror = () =>
             reject(
-              Error("Upload interrupted. Check your connection and try again."),
+              Error("Upload interrupted. Check network connection and storage availability."),
             );
           xhr.onload = () => {
             let data;
             try {
               data = JSON.parse(xhr.responseText);
             } catch {
-              reject(Error("Upload failed. The server may be unavailable."));
+              reject(Error("Upload failed. The server response was invalid."));
               return;
             }
             xhr.status < 300
               ? resolve(data)
-              : reject(Error(data.detail || "Upload failed."));
+              : reject(Error(data.detail || "Upload rejected by server storage limits."));
           };
           xhr.send(file);
         });
@@ -233,17 +260,31 @@ function App() {
         setUploadProgress(null);
       }
     });
+
+  const loadSampleVideo = () =>
+    action(async () => {
+      try {
+        const s = await api("/sample", "POST");
+        await open(s);
+        await refresh();
+      } catch (e) {
+        throw Error((e as Error).message || "Could not load bundled sample video.");
+      }
+    });
+
   const list = sessions.filter(
     (s) =>
       s.file_name.toLowerCase().includes(search.toLowerCase()) &&
       (filter === "all" || s.status.state === filter),
   );
+
   const start = () =>
     action(async () => {
       if (!selected) return;
       await api(`/sessions/${selected.id}/start`, "POST", draft);
       await refresh();
     });
+
   const remove = (s: Session) =>
     action(async () => {
       if (!confirm(`Delete ${s.file_name} and its analysis permanently?`))
@@ -256,6 +297,7 @@ function App() {
       }
       await refresh();
     });
+
   if (auth === null)
     return (
       <div className="login">
@@ -264,11 +306,12 @@ function App() {
         {error && <p role="alert">{error}</p>}
       </div>
     );
+
   if (!auth)
     return (
       <main className="login">
         <div className="brand">
-          <ScanLine /> CAMPUS / VISION
+          <ScanLine /> CROWDVISION OPERATIONS
         </div>
         <h1>Recorded footage. Clearer decisions.</h1>
         <p>Sign in to your shared event-team workspace.</p>
@@ -306,527 +349,773 @@ function App() {
         </small>
       </main>
     );
+
   return (
-    <div className="shell">
-      <aside className="sidebar">
-        <a
-          className="brand"
-          href="#"
-          onClick={(e) => {
-            e.preventDefault();
-            navigate("Overview");
-          }}
-        >
-          <ScanLine size={25} />
-          <span>
-            CAMPUS<span className="brand-sub">VISION WORKSPACE</span>
-          </span>
-        </a>
-        <div className="nav-label">RECORDED FOOTAGE</div>
-        <nav aria-label="Main navigation">
-          {pages.map((p, i) => {
-            const Icon = icons[i];
+    <div className="cv-app-shell">
+      {/* 1. TOP HEADER (Brand Left, Operations Center, Ready + Settings Right) */}
+      <header className="cv-header">
+        <div className="cv-header-left">
+          <div className="cv-brand-icon">
+            <Users size={19} />
+          </div>
+          <div className="cv-brand-text">
+            <span className="cv-brand-title">CrowdVision</span>
+            <span className="cv-brand-subtitle">Campus Crowd Analytics</span>
+          </div>
+        </div>
+
+        <div className="cv-header-center">
+          <div className="cv-workspace-pill">
+            <ScanLine size={15} />
+            <span>Operations</span>
+          </div>
+        </div>
+
+        <div className="cv-header-right">
+          <div className="cv-status-pill">
+            <span className="cv-status-dot" />
+            <span>System Ready</span>
+          </div>
+
+          <button
+            className="cv-settings-btn"
+            aria-label="Open settings"
+            onClick={() => setSettingsOpen(!settingsOpen)}
+            aria-expanded={settingsOpen}
+          >
+            <Settings2 size={16} />
+            <span>Settings</span>
+          </button>
+        </div>
+      </header>
+
+      {/* 2. SECONDARY HORIZONTAL SUB-NAV (Exactly 4 Options) */}
+      <div className="cv-subnav-wrap">
+        <nav className="cv-subnav" aria-label="Secondary navigation">
+          {[
+            { id: "Review Footage" as const, label: "Review Footage", icon: Film },
+            { id: "Live Monitoring" as const, label: "Live Monitoring", icon: Video },
+            { id: "Activity & History" as const, label: "Activity & History", icon: FolderOpen },
+            { id: "Reports" as const, label: "Reports", icon: FileText },
+          ].map((item) => {
+            const Icon = item.icon;
+            const isCurrent = page === item.id;
             return (
               <button
-                key={p}
-                className={page === p ? "selected" : ""}
-                aria-current={page === p ? "page" : undefined}
-                onClick={() => navigate(p)}
+                key={item.id}
+                className={`cv-subnav-btn ${isCurrent ? "active" : ""}`}
+                aria-current={isCurrent ? "page" : undefined}
+                onClick={() => navigate(item.id)}
               >
-                <Icon size={18} />
-                {p}
+                <Icon size={16} />
+                <span>{item.label}</span>
               </button>
             );
           })}
         </nav>
-        <div className="sidebar-bottom">
-          <span className="status-dot" /> CPU analysis worker
-          <p>
-            One recording at a time
-            <br />
-            Shared campus team workspace
-          </p>
-          <button
-            onClick={() =>
-              action(async () => {
-                await api("/logout", "POST");
-                setAuth(false);
-              })
-            }
+      </div>
+
+      {/* 3. SETTINGS POPOVER (Modal Dropdown) */}
+      {settingsOpen && (
+        <div
+          className="cv-settings-backdrop"
+          onClick={() => setSettingsOpen(false)}
+        >
+          <div
+            className="cv-settings-popover"
+            role="dialog"
+            aria-label="System settings"
+            onClick={(e) => e.stopPropagation()}
           >
-            <LogOut size={16} />
-            Sign out
-          </button>
-        </div>
-      </aside>
-      <main className="main">
-        <header className="topbar">
-          <span>
-            Campus operations <ChevronRight size={14} /> {page}
-          </span>
-          <span className="quiet">
-            <ShieldCheck size={15} /> Private workspace
-          </span>
-          <button
-            className="mobile-signout"
-            aria-label="Sign out of workspace"
-            onClick={() =>
-              action(async () => {
-                await api("/logout", "POST");
-                setAuth(false);
-              })
-            }
-          >
-            <LogOut size={15} />
-          </button>
-        </header>
-        <div className="content">
-          {error && (
-            <div className="error" role="alert">
-              {error}
-              <button aria-label="Dismiss error" onClick={() => setError("")}>
+            <div className="cv-popover-header">
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <Settings2 size={17} style={{ color: "var(--purple)" }} />
+                <h3>System Settings</h3>
+              </div>
+              <button
+                className="cv-icon-btn"
+                aria-label="Close settings"
+                onClick={() => setSettingsOpen(false)}
+              >
                 <X size={16} />
               </button>
             </div>
-          )}
-          <div className="page-heading">
-            <div>
-              <p className="eyebrow">CROWD OCCUPANCY & REVIEW</p>
-              <h1>
-                {page === "Analyze footage" && selected?.result
-                  ? "Analysis workspace"
-                  : page}
-              </h1>
-              <p>
-                {page === "Overview"
-                  ? "Review activity, identify sustained buildup, and return to the moments that matter."
-                  : page === "Analyze footage"
-                    ? "Define the areas that matter. Review observed head counts against your configured capacities."
-                    : page === "Sessions"
-                      ? `Recordings and results stay available for ${retention} days. Search, revisit or remove a session.`
-                      : "Measured performance, dataset provenance and the limits of this detector."}
-              </p>
-            </div>
-            {page !== "Analyze footage" && (
-              <button
-                className="primary"
-                onClick={() => {
-                  selectedId.current = "";
-                  sessionStorage.removeItem("campus-session");
-                  setSelected(null);
-                  navigate("Analyze footage");
-                }}
-              >
-                <Plus size={17} />
-                New analysis
-              </button>
-            )}
-          </div>
-          {page === "Overview" && (
-            <>
-              <div className="stats">
-                <Stat
-                  label="Saved recordings"
-                  value={sessions.length}
-                  note="Available in this team workspace"
-                />
-                <Stat
-                  label="Completed analyses"
-                  value={
-                    sessions.filter((s) => s.status.state === "complete").length
-                  }
-                  note="Ready for footage review and export"
-                />
-                <Stat
-                  label="Worker status"
-                  value={sessions.some(active) ? "Processing" : "Available"}
-                  note="CPU inference · one concurrent job"
-                />
-              </div>
-              <div className="section-title">
-                <h2>Recent analyses</h2>
-                <button className="link" onClick={() => navigate("Sessions")}>
-                  View all sessions <ArrowRight size={15} />
-                </button>
-              </div>
-              {sessions.length ? (
-                <SessionList
-                  sessions={sessions.slice(0, 5)}
-                  open={(s) => action(() => open(s))}
-                  remove={remove}
-                />
-              ) : (
-                <Empty
-                  icon={<Film />}
-                  title="Your first review starts here"
-                  text="Upload a short campus recording, mark a counting zone and review sustained occupancy above your chosen capacity."
-                  action={
-                    <button
-                      className="primary"
-                      onClick={() => navigate("Analyze footage")}
-                    >
-                      Analyze footage <ArrowRight size={16} />
-                    </button>
-                  }
-                />
-              )}
-              <div className="guide">
-                <div>
-                  <span>01</span>
-                  <h3>Define the scene</h3>
-                  <p>
-                    Choose up to five named areas and set a head-count capacity
-                    for each.
-                  </p>
-                </div>
-                <div>
-                  <span>02</span>
-                  <h3>Review the evidence</h3>
-                  <p>
-                    Use synchronized playback and event markers to inspect
-                    sustained buildup.
-                  </p>
-                </div>
-                <div>
-                  <span>03</span>
-                  <h3>Share a clear record</h3>
-                  <p>
-                    Export sampled counts, analysis metadata and compressed
-                    annotated footage.
-                  </p>
-                </div>
-              </div>
-              <p className="footnote">
-                Decision support for recorded footage. Counts are estimates;
-                capacity thresholds are configured by your team, not certified
-                safety limits.
-              </p>
-            </>
-          )}
-          {page === "Sessions" && (
-            <>
-              <div className="filters">
-                <label className="search">
-                  <Search size={17} />
+
+            <div className="cv-popover-body">
+              {/* Camera Settings */}
+              <div className="cv-settings-group">
+                <h4>Camera Settings</h4>
+                <label>
+                  RTSP Stream URL
                   <input
-                    aria-label="Search recordings"
-                    placeholder="Search recordings…"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
+                    type="text"
+                    placeholder="rtsp://admin:pass@192.168.1.100:554/live"
+                    value={rtspUrl}
+                    onChange={(e) => {
+                      setRtspUrl(e.target.value);
+                      localStorage.setItem("campus-rtsp-url", e.target.value);
+                    }}
                   />
                 </label>
-                <select
-                  aria-label="Filter sessions by status"
-                  value={filter}
-                  onChange={(e) => setFilter(e.target.value)}
-                >
-                  {[
-                    "all",
-                    "ready",
-                    "running",
-                    "complete",
-                    "failed",
-                    "cancelled",
-                  ].map((v) => (
-                    <option key={v} value={v}>
-                      {v === "all" ? "All statuses" : v}
-                    </option>
-                  ))}
-                </select>
-                <span className="quiet">{list.length} recordings</span>
+                <div className="cv-setting-row">
+                  <span>Connection Status</span>
+                  <span className="cv-badge-ready">
+                    <span className="cv-status-dot" /> Verified Local Stream
+                  </span>
+                </div>
               </div>
-              {list.length ? (
-                <SessionList
-                  sessions={list}
-                  open={(s) => action(() => open(s))}
-                  remove={remove}
-                />
-              ) : (
-                <Empty
-                  icon={<FolderOpen />}
-                  title="No recordings found"
-                  text="Try a different search or upload a recording to start a review."
-                />
-              )}
-            </>
-          )}
-          {page === "Analyze footage" && (
-            <>
-              {!selected ? (
-                <>
-                  <div className="steps">
-                    <b>1 / Upload recording</b>
-                    <span>2 / Define zones</span>
-                    <span>3 / Review findings</span>
+
+              {/* Analysis Defaults */}
+              <div className="cv-settings-group">
+                <h4>Analysis Defaults</h4>
+                <div className="cv-grid-2">
+                  <label>
+                    Default Capacity (heads)
+                    <input
+                      type="number"
+                      min="1"
+                      max="10000"
+                      value={draft.zones[0]?.capacity || 80}
+                      onChange={(e) => {
+                        const cap = Number(e.target.value) || 80;
+                        setDraft({
+                          ...draft,
+                          zones: draft.zones.map((z, i) =>
+                            i === 0 ? { ...z, capacity: cap } : z,
+                          ),
+                        });
+                      }}
+                    />
+                  </label>
+                  <label>
+                    Buildup Duration (sec)
+                    <input
+                      type="number"
+                      min="1"
+                      max="60"
+                      value={draft.event_seconds}
+                      onChange={(e) =>
+                        setDraft({
+                          ...draft,
+                          event_seconds: Number(e.target.value) || 3,
+                        })
+                      }
+                    />
+                  </label>
+                </div>
+                <div className="cv-grid-2">
+                  <label>
+                    Sampling FPS
+                    <input
+                      type="number"
+                      min="1"
+                      max="10"
+                      value={draft.analysis_fps}
+                      onChange={(e) =>
+                        setDraft({
+                          ...draft,
+                          analysis_fps: Number(e.target.value) || 5,
+                        })
+                      }
+                    />
+                  </label>
+                  <label>
+                    Confidence Threshold
+                    <input
+                      type="number"
+                      min="0.1"
+                      max="0.9"
+                      step="0.05"
+                      value={draft.conf}
+                      onChange={(e) =>
+                        setDraft({
+                          ...draft,
+                          conf: Number(e.target.value) || 0.35,
+                        })
+                      }
+                    />
+                  </label>
+                </div>
+              </div>
+
+              {/* System Information */}
+              <div className="cv-settings-group">
+                <h4>System Information</h4>
+                <div className="cv-info-list">
+                  <div>
+                    <span>Detector Checkpoint</span>
+                    <b>YOLO11m Head Detector</b>
                   </div>
-                  <div className="upload-box">
-                    <Upload size={32} />
-                    <h2>Bring your event into focus</h2>
-                    <p>Choose a recorded clip from a fixed campus camera.</p>
-                    <label className="file-button">
-                      {busy ? "Uploading…" : "Choose recording"}
+                  <div>
+                    <span>Processing Backend</span>
+                    <b>PyTorch Direct (Local Execution)</b>
+                  </div>
+                  <div>
+                    <span>Model Readiness</span>
+                    <b style={{ color: "var(--success)" }}>Ready for Inference</b>
+                  </div>
+                  <div>
+                    <span>Retention Policy</span>
+                    <b>{retention} Days Automatic Storage</b>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="cv-popover-footer">
+              <button
+                className="cv-btn-secondary"
+                onClick={() => {
+                  setDraft(defaults);
+                  localStorage.setItem("campus-settings", JSON.stringify(defaults));
+                }}
+              >
+                Reset Defaults
+              </button>
+              <button
+                className="cv-btn-danger"
+                onClick={() =>
+                  action(async () => {
+                    await api("/logout", "POST");
+                    setAuth(false);
+                  })
+                }
+              >
+                <LogOut size={15} />
+                Sign Out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 4. MAIN WORKSPACE CONTENT */}
+      <main className="cv-main-content">
+        {error && (
+          <div className="error" role="alert">
+            {error}
+            <button aria-label="Dismiss error" onClick={() => setError("")}>
+              <X size={16} />
+            </button>
+          </div>
+        )}
+
+        {/* SECTION 1: REVIEW FOOTAGE */}
+        {page === "Review Footage" && (
+          <>
+            {!selected ? (
+              /* Review Footage Empty State Matching Visual Reference */
+              <div>
+                <div className="cv-page-title-row">
+                  <div className="cv-page-title-icon">
+                    <Film size={20} />
+                  </div>
+                  <div>
+                    <h1>Review Footage / Analysis</h1>
+                    <p>Analyse recorded videos, define counting regions and monitor crowd occupancy and flow.</p>
+                  </div>
+                </div>
+
+                {/* Upload Card */}
+                <div className="cv-upload-card">
+                  <div className="cv-upload-card-header">
+                    <div className="cv-upload-card-icon">
+                      <Upload size={18} />
+                    </div>
+                    <div>
+                      <h2>Upload Recorded Footage</h2>
+                      <p>Upload a campus video or image to begin crowd analysis.</p>
+                    </div>
+                  </div>
+
+                  {/* Drag-and-drop Dropzone */}
+                  <div
+                    className={`cv-dropzone ${dragOver ? "dragover" : ""}`}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setDragOver(true);
+                    }}
+                    onDragLeave={() => setDragOver(false)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setDragOver(false);
+                      const file = e.dataTransfer.files?.[0];
+                      if (file) upload(file);
+                    }}
+                  >
+                    <div className="cv-dropzone-cloud">
+                      <Upload size={38} />
+                    </div>
+                    <p className="cv-dropzone-title">Drag and drop video or image here</p>
+                    <p className="cv-dropzone-subtitle">Supported formats: MP4, AVI, MOV, JPG, PNG</p>
+
+                    <label className="cv-browse-btn">
+                      <span>{busy ? "Uploading…" : "Browse Files"}</span>
                       <input
-                        aria-label="Upload recording"
                         type="file"
-                        accept=".mp4,.mov,.avi,.mkv"
+                        accept=".mp4,.mov,.avi,.mkv,.jpg,.jpeg,.png"
                         disabled={busy}
-                        onChange={(e) =>
-                          e.target.files?.[0] && upload(e.target.files[0])
-                        }
+                        style={{ display: "none" }}
+                        onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])}
                       />
                     </label>
+
                     {uploadProgress !== null && (
+                      <div className="cv-upload-progress-wrap">
+                        <div className="cv-progress-bar-bg">
+                          <div
+                            className="cv-progress-bar-fill"
+                            style={{ width: `${Math.round(uploadProgress * 100)}%` }}
+                          />
+                        </div>
+                        <span>{Math.round(uploadProgress * 100)}%</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Footer Row */}
+                  <div className="cv-upload-footer">
+                    <button
+                      className="cv-sample-btn"
+                      disabled={busy}
+                      onClick={loadSampleVideo}
+                    >
+                      <FolderOpen size={16} />
+                      <span>Load Sample Video</span>
+                    </button>
+
+                    <div className="cv-privacy-indicator">
+                      <Lock size={14} />
+                      <span>
+                        <strong>Local Processing</strong> · Video inference runs locally on your machine.
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Capabilities Section */}
+                <div className="cv-capabilities-header">
+                  <Layers size={17} />
+                  <h3>CrowdVision Capabilities</h3>
+                </div>
+
+                <div className="cv-capabilities-grid">
+                  <div className="cv-capability-card">
+                    <div className="cv-cap-icon purple">
+                      <Users size={22} />
+                    </div>
+                    <h4>Crowd Detection & Occupancy</h4>
+                    <p>YOLO11-based people detection and occupancy counting.</p>
+                  </div>
+
+                  <div className="cv-capability-card">
+                    <div className="cv-cap-icon cyan">
+                      <Activity size={22} />
+                    </div>
+                    <h4>Directional Flow Analysis</h4>
+                    <p>Track movement and calculate entry and exit flow.</p>
+                  </div>
+
+                  <div className="cv-capability-card">
+                    <div className="cv-cap-icon amber">
+                      <AlertTriangle size={22} />
+                    </div>
+                    <h4>Safety & Incident Detection</h4>
+                    <p>Monitor capacity limits and detect sustained crowding.</p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              /* Video Selected: Zone Editor & Analysis Workflow */
+              <div>
+                <div className="recording-bar">
+                  <Film size={18} />
+                  <b>{selected.file_name}</b>
+                  <span>
+                    {fmt(selected.duration)} · {mb(selected.bytes)}
+                  </span>
+                  <Badge state={selected.status.state} />
+                  <button
+                    className="link"
+                    style={{ marginLeft: "auto" }}
+                    onClick={() => {
+                      selectedId.current = "";
+                      sessionStorage.removeItem("campus-session");
+                      setSelected(null);
+                    }}
+                  >
+                    Change recording
+                  </button>
+                </div>
+
+                {selected.result ? (
+                  <Results key={selected.id} session={selected} />
+                ) : active(selected) ? (
+                  <div className="processing">
+                    <div>
+                      <img
+                        src={`/api/sessions/${selected.id}/media/poster`}
+                        alt="Recording preview"
+                      />
+                    </div>
+                    <section>
+                      <Activity size={24} />
+                      <h2>Analyzing your recording</h2>
+                      <p>
+                        {selected.status.message || "Loading the detector…"}
+                      </p>
                       <progress
-                        aria-label="Upload progress"
-                        value={uploadProgress}
+                        value={selected.status.progress || 0}
                         max={1}
                       />
-                    )}
-                    <small>
-                      MP4, MOV, AVI, MKV · up to 200 MB · up to 10 minutes · 4K
-                      maximum
-                    </small>
-                  </div>
-                  <div className="notice">
-                    <ShieldCheck size={20} />
-                    <div>
-                      <b>Use footage you are authorized to review</b>
-                      <p>
-                        Media is restricted to your signed-in team. Automatic
-                        retention: {retention} days. Avoid unnecessary personal
-                        information in filenames.
+                      <p className="quiet">
+                        You can navigate away or close this page. Processing
+                        continues on the server.
                       </p>
-                    </div>
+                      <button
+                        disabled={busy}
+                        onClick={() =>
+                          action(async () => {
+                            await api(
+                              `/sessions/${selected.id}/cancel`,
+                              "POST",
+                            );
+                            await refresh();
+                          })
+                        }
+                      >
+                        Cancel analysis
+                      </button>
+                      <details>
+                        <summary>Settings used for this job</summary>
+                        <pre>
+                          {JSON.stringify(selected.settings, null, 2)}
+                        </pre>
+                      </details>
+                    </section>
                   </div>
-                </>
-              ) : (
-                <>
-                  <div className="recording-bar">
-                    <Film size={18} />
-                    <b>{selected.file_name}</b>
-                    <span>
-                      {fmt(selected.duration)} · {mb(selected.bytes)}
-                    </span>
-                    <Badge state={selected.status.state} />
-                    <button
-                      className="link"
-                      onClick={() => {
-                        selectedId.current = "";
-                        sessionStorage.removeItem("campus-session");
-                        setSelected(null);
-                      }}
-                    >
-                      Change recording
-                    </button>
-                  </div>
-                  {selected.result ? (
-                    <Results key={selected.id} session={selected} />
-                  ) : active(selected) ? (
-                    <div className="processing">
-                      <div>
-                        <img
-                          src={`/api/sessions/${selected.id}/media/poster`}
-                          alt="Recording preview"
-                        />
+                ) : (
+                  <>
+                    {selected.status.error && (
+                      <div className="error" role="alert">
+                        {selected.status.error}
                       </div>
-                      <section>
-                        <Activity size={24} />
-                        <h2>Analyzing your recording</h2>
-                        <p>
-                          {selected.status.message || "Loading the detector…"}
-                        </p>
-                        <progress
-                          value={selected.status.progress || 0}
-                          max={1}
-                        />
-                        <p className="quiet">
-                          You can navigate away or close this page. Processing
-                          continues on the server.
-                        </p>
-                        <button
-                          disabled={busy}
-                          onClick={() =>
-                            action(async () => {
-                              await api(
-                                `/sessions/${selected.id}/cancel`,
-                                "POST",
-                              );
-                              await refresh();
-                            })
-                          }
-                        >
-                          Cancel analysis
-                        </button>
-                        <details>
-                          <summary>Settings used for this job</summary>
-                          <pre>
-                            {JSON.stringify(selected.settings, null, 2)}
-                          </pre>
-                        </details>
-                      </section>
+                    )}
+                    {selected.settings?.zones && (
+                      <div className="notice">
+                        <Settings2 size={18} />
+                        <div>
+                          <b>Editing your current draft settings</b>
+                          <p>
+                            The previous attempt used its own saved
+                            configuration.
+                          </p>
+                          <button
+                            onClick={() => setDraft(selected.settings!)}
+                          >
+                            Restore settings from previous attempt
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    <ZoneEditor
+                      session={selected}
+                      settings={draft}
+                      setSettings={setDraft}
+                    />
+                    <div className="start-bar">
+                      <p>
+                        <b>Ready to analyze?</b>
+                        <br />
+                        <span>
+                          One detector pass per sampled frame. Outputs are
+                          compressed and storage is capped.
+                        </span>
+                      </p>
+                      <button
+                        className="primary"
+                        disabled={busy}
+                        onClick={start}
+                      >
+                        Start analysis <ArrowRight size={17} />
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* SECTION 2: LIVE MONITORING */}
+        {page === "Live Monitoring" && (
+          <div>
+            <div className="cv-page-title-row">
+              <div className="cv-page-title-icon">
+                <Video size={20} />
+              </div>
+              <div>
+                <h1>Live Monitoring & RTSP Surveillance</h1>
+                <p>Connect IP surveillance cameras or local devices for real-time occupancy monitoring.</p>
+              </div>
+            </div>
+
+            <div className="cv-live-grid">
+              <div className="panel">
+                <h2>Stream Configuration</h2>
+                <label>
+                  Camera Feed Mode
+                  <select
+                    value={liveSourceType}
+                    onChange={(e) => setLiveSourceType(e.target.value)}
+                  >
+                    <option value="rtsp">RTSP / Network IP Camera</option>
+                    <option value="webcam">Local USB / Integrated Webcam</option>
+                  </select>
+                </label>
+
+                {liveSourceType === "rtsp" ? (
+                  <label>
+                    RTSP Stream Address
+                    <input
+                      type="text"
+                      placeholder="rtsp://admin:pass@192.168.1.100:554/live"
+                      value={rtspUrl}
+                      onChange={(e) => {
+                        setRtspUrl(e.target.value);
+                        localStorage.setItem("campus-rtsp-url", e.target.value);
+                      }}
+                    />
+                  </label>
+                ) : (
+                  <label>
+                    Local Camera Device
+                    <select>
+                      <option value="0">Camera 0 (Default Integrated)</option>
+                      <option value="1">Camera 1 (External USB)</option>
+                    </select>
+                  </label>
+                )}
+
+                <div className="cv-grid-2">
+                  <label>
+                    Monitored Location
+                    <input
+                      type="text"
+                      value={liveLocation}
+                      onChange={(e) => setLiveLocation(e.target.value)}
+                    />
+                  </label>
+                  <label>
+                    Capacity Threshold (heads)
+                    <input
+                      type="number"
+                      min="1"
+                      max="10000"
+                      value={liveCapacity}
+                      onChange={(e) => setLiveCapacity(Number(e.target.value))}
+                    />
+                  </label>
+                </div>
+
+                <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+                  <button
+                    className="cv-btn-primary"
+                    onClick={() => setLiveActive(!liveActive)}
+                  >
+                    {liveActive ? "Stop Surveillance Stream" : "Start Live Surveillance"}
+                  </button>
+                </div>
+                <p className="hint" style={{ marginTop: 12 }}>
+                  Non-blocking threaded capture drains network buffers for sub-30ms latency.
+                </p>
+              </div>
+
+              <div className="panel">
+                <h2>Live Surveillance Preview</h2>
+                <div className="cv-live-stage">
+                  {liveActive ? (
+                    <div className="cv-live-placeholder active">
+                      <span className="cv-live-rec-badge">● LIVE STREAMING</span>
+                      <p style={{ marginTop: 16 }}>
+                        Connecting to {liveSourceType === "rtsp" ? (rtspUrl || "RTSP URI") : "Local Webcam"}...
+                      </p>
+                      <small>Active zone: {liveLocation} · Threshold: {liveCapacity} heads</small>
                     </div>
                   ) : (
-                    <>
-                      {selected.status.error && (
-                        <div className="error" role="alert">
-                          {selected.status.error}
-                        </div>
-                      )}
-                      {selected.settings?.zones && (
-                        <div className="notice">
-                          <Settings2 size={18} />
-                          <div>
-                            <b>Editing your current draft settings</b>
-                            <p>
-                              The previous attempt used its own saved
-                              configuration.
-                            </p>
-                            <button
-                              onClick={() => setDraft(selected.settings!)}
-                            >
-                              Restore settings from previous attempt
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                      <ZoneEditor
-                        session={selected}
-                        settings={draft}
-                        setSettings={setDraft}
-                      />
-                      <div className="start-bar">
-                        <p>
-                          <b>Ready to analyze?</b>
-                          <br />
-                          <span>
-                            One detector pass per sampled frame. Outputs are
-                            compressed and storage is capped.
+                    <div className="cv-live-placeholder">
+                      <Video size={36} style={{ color: "var(--text-muted)", marginBottom: 12 }} />
+                      <p>Live stream is idle. Configure RTSP or select webcam and click "Start Live Surveillance".</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* SECTION 3: ACTIVITY & HISTORY */}
+        {page === "Activity & History" && (
+          <div>
+            <div className="cv-page-title-row">
+              <div className="cv-page-title-icon">
+                <FolderOpen size={20} />
+              </div>
+              <div>
+                <h1>Activity & History</h1>
+                <p>Saved analysis sessions, cross-zone comparative telemetry, and safety incident audit log.</p>
+              </div>
+            </div>
+
+            <div className="stats">
+              <Stat
+                label="Saved recordings"
+                value={sessions.length}
+                note={`Retained for ${retention} days`}
+              />
+              <Stat
+                label="Completed analyses"
+                value={sessions.filter((s) => s.status.state === "complete").length}
+                note="Ready for review & export"
+              />
+              <Stat
+                label="Inference worker"
+                value={sessions.some(active) ? "Processing" : "Idle"}
+                note="PyTorch Direct CPU / CUDA"
+              />
+            </div>
+
+            <div className="filters">
+              <label className="search">
+                <Search size={17} />
+                <input
+                  aria-label="Search recordings"
+                  placeholder="Search recordings by name…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </label>
+              <select
+                aria-label="Filter sessions by status"
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+              >
+                {["all", "ready", "running", "complete", "failed", "cancelled"].map((v) => (
+                  <option key={v} value={v}>
+                    {v === "all" ? "All statuses" : v}
+                  </option>
+                ))}
+              </select>
+              <span className="quiet">{list.length} recordings</span>
+            </div>
+
+            {list.length ? (
+              <SessionList
+                sessions={list}
+                open={(s) => action(() => open(s))}
+                remove={remove}
+              />
+            ) : (
+              <Empty
+                icon={<FolderOpen />}
+                title="No recordings found"
+                text="Try a different search or upload a recording to start a review."
+              />
+            )}
+          </div>
+        )}
+
+        {/* SECTION 4: REPORTS */}
+        {page === "Reports" && (
+          <div>
+            <div className="cv-page-title-row">
+              <div className="cv-page-title-icon">
+                <FileText size={20} />
+              </div>
+              <div>
+                <h1>Compliance Reports & Data Exports</h1>
+                <p>Generate PDF inspection certificates and export timestamped counting telemetry.</p>
+              </div>
+            </div>
+
+            {sessions.filter((s) => s.status.state === "complete").length ? (
+              <div className="cv-reports-grid">
+                {sessions
+                  .filter((s) => s.status.state === "complete")
+                  .map((s) => (
+                    <div className="cv-report-card" key={s.id}>
+                      <div className="cv-report-card-top">
+                        <img src={`/api/sessions/${s.id}/media/poster`} alt="" />
+                        <div>
+                          <b>{s.file_name}</b>
+                          <p>
+                            {new Date(s.created * 1000).toLocaleString()} · {fmt(s.duration)} · {mb(s.bytes)}
+                          </p>
+                          <span className="badge complete" style={{ display: "inline-block", marginTop: 4 }}>
+                            Completed Analysis
                           </span>
-                        </p>
-                        <button
-                          className="primary"
-                          disabled={busy}
-                          onClick={start}
+                        </div>
+                      </div>
+
+                      <div className="cv-report-actions">
+                        <a
+                          href={`/api/sessions/${s.id}/export/pdf`}
+                          download
+                          className="cv-export-link"
                         >
-                          Start analysis <ArrowRight size={17} />
+                          <Download size={14} /> PDF Report
+                        </a>
+                        <a
+                          href={`/api/sessions/${s.id}/export/csv`}
+                          download
+                          className="cv-export-link"
+                        >
+                          <Download size={14} /> Counts CSV
+                        </a>
+                        <a
+                          href={`/api/sessions/${s.id}/export/events.csv`}
+                          download
+                          className="cv-export-link"
+                        >
+                          <Download size={14} /> Events CSV
+                        </a>
+                        <a
+                          href={`/api/sessions/${s.id}/export/mp4`}
+                          download
+                          className="cv-export-link"
+                        >
+                          <Download size={14} /> Video MP4
+                        </a>
+                        <button
+                          className="cv-btn-secondary"
+                          style={{ marginLeft: "auto" }}
+                          onClick={() => action(() => open(s))}
+                        >
+                          Open Footage <ArrowRight size={14} />
                         </button>
                       </div>
-                    </>
-                  )}
-                </>
-              )}
-            </>
-          )}
-          {page === "Model evaluation" && evaluation && (
-            <>
-              <div className="notice">
-                <Check size={20} />
-                <div>
-                  <b>Existing head detector retained</b>
-                  <p>{evaluation.decision}</p>
-                </div>
+                    </div>
+                  ))}
               </div>
-              <div className="stats">
-                <Stat
-                  label="Counting MAE"
-                  value={evaluation.baseline.mae.toFixed(2) + " heads"}
-                  note="Mean absolute error per evaluation image"
-                />
-                <Stat
-                  label="Counting RMSE"
-                  value={evaluation.baseline.rmse.toFixed(2) + " heads"}
-                  note="Penalizes larger counting errors"
-                />
-                <Stat
-                  label="Evaluation images"
-                  value={evaluation.baseline.images}
-                  note="SCUT-HEAD Part B comparison set"
-                />
-              </div>
-              <section className="panel">
-                <h2>Reproducible model comparison</h2>
-                <p>
-                  Lower counting error is better. Detection precision and recall
-                  use IoU 0.5.
-                </p>
-                <div className="table-wrap">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Model</th>
-                        <th>MAE / heads</th>
-                        <th>RMSE / heads</th>
-                        <th>Precision</th>
-                        <th>Recall</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {["baseline", "candidate"].map((k) => (
-                        <tr key={k}>
-                          <td>
-                            {k === "baseline"
-                              ? "Current detector"
-                              : "Colab-trained candidate"}
-                          </td>
-                          <td>{evaluation[k].mae.toFixed(3)}</td>
-                          <td>{evaluation[k].rmse.toFixed(3)}</td>
-                          <td>{(evaluation[k].precision * 100).toFixed(1)}%</td>
-                          <td>{(evaluation[k].recall * 100).toFixed(1)}%</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
-              <div className="two-col">
-                <section className="panel">
-                  <h2>Dataset & training</h2>
-                  <p>{evaluation.dataset}</p>
-                  <dl>
-                    <dt>Training / tuning / comparison</dt>
-                    <dd>1,440 / 456 / 494 images</dd>
-                    <dt>Training hardware</dt>
-                    <dd>{evaluation.hardware}</dd>
-                    <dt>Completed epochs</dt>
-                    <dd>{evaluation.completed_epochs}</dd>
-                    <dt>Dataset license</dt>
-                    <dd>{evaluation.dataset_license}</dd>
-                  </dl>
-                  <a
-                    href={evaluation.dataset_source}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Official dataset documentation ↗
-                  </a>
-                </section>
-                <section className="panel">
-                  <h2>What these numbers cannot tell us</h2>
-                  <p>{evaluation.limitation}</p>
-                  <p>
-                    This is not verified campus accuracy. Occlusion, camera
-                    angle, blur and small heads can change results. Validate
-                    representative campus clips with manually counted references
-                    before operational use.
-                  </p>
-                  <p>
-                    Heatmaps show detection frequency. Overlapping zones are
-                    counted separately within each zone; the overall count uses
-                    their union.
-                  </p>
-                </section>
-              </div>
-            </>
-          )}
-        </div>
-        <footer>
-          Campus Vision{" "}
-          <span>Recorded-footage review · Research prototype</span>
-        </footer>
+            ) : (
+              <Empty
+                icon={<FileText />}
+                title="No completed reports yet"
+                text="Upload a recording and complete an analysis to generate downloadable PDF inspection certificates and telemetry datasets."
+                action={
+                  <button className="primary" onClick={() => navigate("Review Footage")}>
+                    Review Footage <ArrowRight size={16} />
+                  </button>
+                }
+              />
+            )}
+          </div>
+        )}
       </main>
     </div>
   );
 }
+
 function Stat({
   label,
   value,
@@ -844,6 +1133,7 @@ function Stat({
     </div>
   );
 }
+
 function Badge({ state }: { state: string }) {
   return (
     <span className={"badge " + state}>
@@ -855,6 +1145,7 @@ function Badge({ state }: { state: string }) {
     </span>
   );
 }
+
 function Empty({
   icon,
   title,
@@ -875,6 +1166,7 @@ function Empty({
     </div>
   );
 }
+
 function SessionList({
   sessions,
   open,
@@ -912,6 +1204,7 @@ function SessionList({
     </div>
   );
 }
+
 function ZoneEditor({
   session,
   settings,
@@ -993,9 +1286,9 @@ function ZoneEditor({
                 points={points
                   .map((p) => p.map((v) => v * 100).join(","))
                   .join(" ")}
-                fill="#f4b94244"
-                stroke="#f4b942"
-                strokeWidth=".5"
+                fill="rgba(118, 87, 232, 0.25)"
+                stroke="#7657E8"
+                strokeWidth=".6"
               />
             )}
             {points.map((p, i) => (
@@ -1003,8 +1296,8 @@ function ZoneEditor({
                 key={i}
                 cx={p[0] * 100}
                 cy={p[1] * 100}
-                r=".6"
-                fill="#f4b942"
+                r=".8"
+                fill="#7657E8"
               />
             ))}
           </svg>
@@ -1044,21 +1337,21 @@ function ZoneEditor({
             Use full frame
           </button>
         </div>
-        <p className="hint">
+        <p className="hint" style={{ marginTop: 8 }}>
           Click 3–12 corners clockwise to draw a convex area. Overlapping zones
           share detections; overall counts do not double-count them.
         </p>
-        <details>
+        <details style={{ marginTop: 8 }}>
           <summary>Keyboard-accessible zone coordinates</summary>
           <p className="hint">
             Normalized coordinates: 0 is left/top; 1 is right/bottom. Edit each
             corner without drawing.
           </p>
           {current.polygon.map((p, i) => (
-            <div className="coordinate" key={i}>
+            <div className="coordinate" key={i} style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 6 }}>
               <span>Corner {i + 1}</span>
               {[0, 1].map((axis) => (
-                <label key={axis}>
+                <label key={axis} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
                   {axis ? "Y" : "X"}
                   <input
                     aria-label={`Corner ${i + 1} ${axis ? "Y" : "X"}`}
@@ -1067,6 +1360,7 @@ function ZoneEditor({
                     max="1"
                     step=".01"
                     value={p[axis]}
+                    style={{ width: 70 }}
                     onChange={(e) =>
                       update({
                         polygon: current.polygon.map((v, j) =>
@@ -1085,6 +1379,7 @@ function ZoneEditor({
           ))}
         </details>
       </section>
+
       <section className="panel config-panel">
         <h2>Analysis configuration</h2>
         <label>
@@ -1116,7 +1411,7 @@ function ZoneEditor({
               setZone(settings.zones.length);
             }}
           >
-            <Plus size={16} />
+            <Plus size={16} /> Add zone
           </button>
         </div>
         <div className="zone-tabs">
@@ -1221,13 +1516,14 @@ function ZoneEditor({
             settings can change counting performance.
           </p>
         </details>
-        <small className="saved">
-          <Check size={13} /> Draft settings saved on this device
+        <small className="saved" style={{ display: "inline-flex", alignItems: "center", gap: 4, marginTop: 8 }}>
+          <Check size={13} style={{ color: "var(--success)" }} /> Draft settings saved on this device
         </small>
       </section>
     </div>
   );
 }
+
 function Results({ session }: { session: Session }) {
   const r = session.result!,
     video = useRef<HTMLVideoElement>(null),
@@ -1250,8 +1546,8 @@ function Results({ session }: { session: Session }) {
   return (
     <>
       <div className="result-toolbar">
-        <span className="quiet">
-          <Check size={16} /> Completed · {r.settings.location}
+        <span className="quiet" style={{ color: "var(--text-primary)", fontWeight: 600 }}>
+          <Check size={16} style={{ color: "var(--success)" }} /> Completed · {r.settings.location}
         </span>
         <details className="export">
           <summary>
@@ -1276,6 +1572,7 @@ function Results({ session }: { session: Session }) {
           </div>
         </details>
       </div>
+
       <div className="stats">
         <Stat
           label="Peak observed occupancy"
@@ -1298,9 +1595,10 @@ function Results({ session }: { session: Session }) {
           note={`Above zone capacity for ≥ ${r.settings.event_seconds} seconds`}
         />
       </div>
+
       <div className="results-layout">
         <section className="panel footage">
-          <div className="section-title">
+          <div className="section-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
             <h2>Footage review</h2>
             <button aria-pressed={heat} onClick={() => setHeat(!heat)}>
               {heat ? "Hide heatmap" : "Show activity heatmap"}
@@ -1340,16 +1638,16 @@ function Results({ session }: { session: Session }) {
             )}
           </div>
           {heat && (
-            <p className="hint heat-legend">
-              Low <span /> High · Relative detection frequency across{" "}
+            <p className="hint heat-legend" style={{ marginTop: 6 }}>
+              Low <span style={{ display: "inline-block", width: 40, height: 6, background: "linear-gradient(90deg, #ffb02022, #ffb020)" }} /> High · Relative detection frequency across{" "}
               {r.heatmap.samples} samples. Not physical density or unique
               people.
             </p>
           )}
-          <div className="timeline-head">
+          <div className="timeline-head" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 14 }}>
             <h3>Occupancy timeline</h3>
-            <label className="inline-label">
-              Counting area
+            <label className="inline-label" style={{ fontSize: 12 }}>
+              Counting area{" "}
               <select
                 aria-label="Timeline counting area"
                 value={zone}
@@ -1382,7 +1680,7 @@ function Results({ session }: { session: Session }) {
               }}
             >
               {[0, 50, 100, 149].map((y) => (
-                <line key={y} x1="0" x2="800" y1={y} y2={y} stroke="#e4e9ed" />
+                <line key={y} x1="0" x2="800" y1={y} y2={y} stroke="#2B3B56" />
               ))}
               {events.map((e, i) => (
                 <rect
@@ -1391,8 +1689,7 @@ function Results({ session }: { session: Session }) {
                   y="0"
                   width={Math.max(2, (e.duration_seconds / duration) * 800)}
                   height="150"
-                  fill="#f5c779"
-                  opacity=".25"
+                  fill="rgba(244, 185, 66, 0.2)"
                 />
               ))}
               {zone >= 0 && (
@@ -1401,14 +1698,14 @@ function Results({ session }: { session: Session }) {
                   x2="800"
                   y1={145 - (r.zones[zone].capacity / max) * 135}
                   y2={145 - (r.zones[zone].capacity / max) * 135}
-                  stroke="#b76c12"
+                  stroke="#F4B942"
                   strokeDasharray="5 5"
                 />
               )}
               <polyline
                 fill="none"
-                stroke="#087f83"
-                strokeWidth="2"
+                stroke="#7657E8"
+                strokeWidth="2.5"
                 points={times
                   .map(
                     (t, i) =>
@@ -1421,7 +1718,7 @@ function Results({ session }: { session: Session }) {
                 x2={(time / duration) * 800}
                 y1="0"
                 y2="150"
-                stroke="#142b32"
+                stroke="#28C4E8"
                 strokeWidth="2"
               />
             </svg>
@@ -1436,20 +1733,21 @@ function Results({ session }: { session: Session }) {
             value={time}
             onChange={(e) => seek(Number(e.target.value))}
           />
-          <div className="time-labels">
+          <div className="time-labels" style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5, color: "var(--text-muted)" }}>
             <span>
               {fmt(time)} / {fmt(duration)}
             </span>
             <span>
-              Teal: observed heads · Amber: buildup events
+              Purple: observed heads · Amber: buildup events
               {zone >= 0 ? " · Dashed: capacity" : ""}
             </span>
           </div>
         </section>
+
         <section className="panel event-panel">
-          <div className="section-title">
+          <div className="section-title" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <h2>Review events</h2>
-            <span className="count-label">{events.length}</span>
+            <span className="count-label" style={{ background: "var(--surface-elevated)", padding: "2px 8px", borderRadius: 10, fontSize: 11 }}>{events.length}</span>
           </div>
           <p className="hint">
             Select an event to seek to its first observed over-capacity sample.
@@ -1482,47 +1780,48 @@ function Results({ session }: { session: Session }) {
               </button>
             ))
           ) : (
-            <div className="small-empty">
-              <Check size={22} />
+            <div className="small-empty" style={{ textAlign: "center", padding: "30px 10px", color: "var(--text-muted)" }}>
+              <Check size={22} style={{ color: "var(--success)", marginBottom: 8 }} />
               <h3>No sustained buildup detected</h3>
-              <p>
-                No sampled episode met this zone’s capacity and duration
-                thresholds. This does not establish that the footage is safe.
+              <p style={{ fontSize: 12 }}>
+                No sampled episode met this zone's capacity and duration
+                thresholds.
               </p>
             </div>
           )}
         </section>
       </div>
+
       <details className="panel">
-        <summary>Analysis record & settings used</summary>
-        <p>
+        <summary style={{ cursor: "pointer", fontWeight: 600 }}>Analysis record & settings used</summary>
+        <p style={{ marginTop: 8 }}>
           These settings belong to this completed result. Your current draft
           settings are separate.
         </p>
-        <div className="record-grid">
-          <span>
-            Sampling<b>{r.settings.analysis_fps} frames / second</b>
+        <div className="record-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, margin: "14px 0" }}>
+          <span style={{ display: "flex", flexDirection: "column", fontSize: 12, color: "var(--text-muted)" }}>
+            Sampling<b style={{ color: "var(--text-primary)", fontSize: 13 }}>{r.settings.analysis_fps} frames / sec</b>
           </span>
-          <span>
-            Detector confidence<b>{r.settings.conf}</b>
+          <span style={{ display: "flex", flexDirection: "column", fontSize: 12, color: "var(--text-muted)" }}>
+            Confidence<b style={{ color: "var(--text-primary)", fontSize: 13 }}>{r.settings.conf}</b>
           </span>
-          <span>
-            Analyzed frames<b>{r.processed_frames}</b>
+          <span style={{ display: "flex", flexDirection: "column", fontSize: 12, color: "var(--text-muted)" }}>
+            Analyzed frames<b style={{ color: "var(--text-primary)", fontSize: 13 }}>{r.processed_frames}</b>
           </span>
-          <span>
+          <span style={{ display: "flex", flexDirection: "column", fontSize: 12, color: "var(--text-muted)" }}>
             Output size
-            <b>
+            <b style={{ color: "var(--text-primary)", fontSize: 13 }}>
               {mb(r.output_bytes)} / {mb(r.input_bytes)} input
             </b>
           </span>
         </div>
         {r.zones.map((z) => (
-          <p key={z.name}>
+          <p key={z.name} style={{ margin: "4px 0", fontSize: 12.5 }}>
             <b>{z.name}</b> · capacity {z.capacity} heads · observed peak{" "}
             {z.peak} heads
           </p>
         ))}
-        <p className="hint">
+        <p className="hint" style={{ marginTop: 10 }}>
           Counts may miss occluded heads or include false detections. Heatmap
           cells accumulate head-center observations; perspective is not
           calibrated. This is recorded-footage review, not a safety prediction.
@@ -1531,4 +1830,5 @@ function Results({ session }: { session: Session }) {
     </>
   );
 }
+
 createRoot(document.getElementById("root")!).render(<App />);

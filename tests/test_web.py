@@ -61,6 +61,21 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(self.client.post('/api/upload',content=b'bad',headers={**self.headers,'X-File-Name':'bad.txt'}).status_code,415)
         self.assertEqual(self.client.post('/api/upload',content=b'bad',headers={**self.headers,'X-File-Name':'bad.mp4'}).status_code,422)
         self.assertEqual(list(self.sessions.iterdir()),[])
+    def test_image_upload_and_sample_endpoint(self):
+        import numpy as np, cv2
+        self.login()
+        # Test sample 404 when no sample file exists
+        self.assertEqual(self.client.post('/api/sample',headers=self.headers).status_code,404)
+        # Test valid image upload
+        img = np.zeros((30, 30, 3), dtype=np.uint8)
+        _, encoded = cv2.imencode('.png', img)
+        img_bytes = encoded.tobytes()
+        r = self.client.post('/api/upload', content=img_bytes, headers={**self.headers, 'X-File-Name': 'campus.png'})
+        self.assertEqual(r.status_code, 200)
+        data = r.json()
+        self.assertEqual(data['file_name'], 'campus.png')
+        self.assertTrue((self.sessions / data['id'] / 'poster.jpg').is_file())
+        self.assertTrue((self.sessions / data['id'] / 'metadata.json').is_file())
     def test_busy_worker_and_immutable_result_and_cancel(self):
         self.login();key='a'*32;path=self.sessions/key;path.mkdir()
         atomic_json(path/'metadata.json',dict(created=1,file_name='clip.mp4',source='source.mp4'))

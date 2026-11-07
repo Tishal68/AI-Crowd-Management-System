@@ -208,8 +208,8 @@ async def upload(request: Request):
     from urllib.parse import unquote
     name = Path(unquote(name).replace('\\', '/')).name[:120]
     suffix = Path(name).suffix.lower()
-    if suffix not in ('.mp4', '.mov', '.avi', '.mkv'):
-        raise HTTPException(415, 'Choose an MP4, MOV, AVI or MKV recording. Images remain supported in the legacy app.')
+    if suffix not in ('.mp4', '.mov', '.avi', '.mkv', '.jpg', '.jpeg', '.png'):
+        raise HTTPException(415, 'Choose an MP4, MOV, AVI, MKV recording or JPG, PNG image.')
     if int(request.headers.get('content-length', '0') or '0') > MAX_UPLOAD:
         raise HTTPException(413, 'Recording exceeds the maximum upload limit.')
     if upload_lock.locked():
@@ -219,7 +219,8 @@ async def upload(request: Request):
         await asyncio.to_thread(dispatch_lock.acquire)
         path = SESSIONS / uuid.uuid4().hex
         try:
-            check_storage_budget(ROOT, MAX_UPLOAD)
+            req_size = int(request.headers.get('content-length', '0') or '0')
+            check_storage_budget(ROOT, max(req_size, 50 * 1024**2))
             path.mkdir(parents=True)
             size = 0
             with (path/('source'+suffix)).open('wb') as target:
@@ -228,20 +229,67 @@ async def upload(request: Request):
                     if size > MAX_UPLOAD:
                         raise HTTPException(413, 'Recording exceeds the maximum upload limit.')
                     target.write(chunk)
-            cap = cv2.VideoCapture(str(path/('source'+suffix)))
+            if suffix in ('.jpg', '.jpeg', '.png'):
+                frame = cv2.imread(str(path/('source'+suffix)))
+                if frame is None:
+                    raise HTTPException(422, 'Cannot decode image. Upload a valid JPG or PNG.')
+                height, width = frame.shape[:2]
+                scale = min(1, 1280/width)
+                cv2.imwrite(str(path/'poster.jpg'), cv2.resize(frame, (int(width*scale), int(height*scale))))
+                atomic_json(path/'metadata.json', dict(file_name=name, source='source'+suffix, created=time.time(), bytes=size, duration=1.0, width=width, height=height, media_type='image'))
+            else:
+                cap = cv2.VideoCapture(str(path/('source'+suffix)))
+                try:
+                    width, height = cap.get(cv2.CAP_PROP_FRAME_WIDTH), cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
+                    fps, frames = cap.get(cv2.CAP_PROP_FPS), cap.get(cv2.CAP_PROP_FRAME_COUNT)
+                    if not 1 <= width <= 4096 or not 1 <= height <= 2160 or not 0 < fps <= 240 or not 0 < frames/fps <= 600:
+                        raise HTTPException(422, 'Use a decodable recording up to 4096 × 2160, 240 FPS and 10 minutes.')
+                    ok, frame = cap.read()
+                    if not ok:
+                        raise HTTPException(422, 'No readable video frame. Re-export as H.264 MP4.')
+                    scale = min(1, 1280/width)
+                    cv2.imwrite(str(path/'poster.jpg'), cv2.resize(frame, (int(width*scale), int(height*scale))))
+                finally:
+                    cap.release()
+                atomic_json(path/'metadata.json', dict(file_name=name, source='source'+suffix, created=time.time(), bytes=size, duration=frames/fps, width=width, height=height, media_type='video'))
+            return summary(path)
+        except ValueError as exc:
+            shutil.rmtree(path, ignore_errors=True)
+            raise HTTPException(507, str(exc))
+        except BaseException:
+            shutil.rmtree(path, ignore_errors=True)
+            raise
+        finally:
+            await asyncio.to_thread(dispatch_lock.release)
+
+
+@app.post('/api/sample')
+async def load_sample():
+    sample_file = ROOT / '_uploads' / '12269404_2320_1080_30fps.mp4'
+    if not sample_file.is_file():
+        raise HTTPException(404, 'Bundled sample video not found on server.')
+    if upload_lock.locked():
+        raise HTTPException(409, 'Another upload is in progress. Try again shortly.')
+    async with upload_lock:
+        dispatch_lock = FileLock(str(ROOT/'.dispatch.lock'), timeout=5, thread_local=False)
+        await asyncio.to_thread(dispatch_lock.acquire)
+        path = SESSIONS / uuid.uuid4().hex
+        try:
+            size = sample_file.stat().st_size
+            check_storage_budget(ROOT, size)
+            path.mkdir(parents=True)
+            dest = path / 'source.mp4'
+            shutil.copyfile(sample_file, dest)
+            cap = cv2.VideoCapture(str(dest))
             try:
                 width, height = cap.get(cv2.CAP_PROP_FRAME_WIDTH), cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
                 fps, frames = cap.get(cv2.CAP_PROP_FPS), cap.get(cv2.CAP_PROP_FRAME_COUNT)
-                if not 1 <= width <= 4096 or not 1 <= height <= 2160 or not 0 < fps <= 240 or not 0 < frames/fps <= 600:
-                    raise HTTPException(422, 'Use a decodable recording up to 4096 × 2160, 240 FPS and 10 minutes.')
                 ok, frame = cap.read()
-                if not ok:
-                    raise HTTPException(422, 'No readable video frame. Re-export as H.264 MP4.')
                 scale = min(1, 1280/width)
                 cv2.imwrite(str(path/'poster.jpg'), cv2.resize(frame, (int(width*scale), int(height*scale))))
             finally:
                 cap.release()
-            atomic_json(path/'metadata.json', dict(file_name=name, source='source'+suffix, created=time.time(), bytes=size, duration=frames/fps, width=width, height=height))
+            atomic_json(path/'metadata.json', dict(file_name='12269404_2320_1080_30fps.mp4', source='source.mp4', created=time.time(), bytes=size, duration=frames/fps, width=width, height=height, media_type='video'))
             return summary(path)
         except ValueError as exc:
             shutil.rmtree(path, ignore_errors=True)
