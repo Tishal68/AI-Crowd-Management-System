@@ -53,9 +53,28 @@ html, body, [class*="css"] {
     color: #EDF2FA !important;
 }
 
-.block-container {
-    max-width: 1650px;
-    padding: 0.8rem 1.8rem 2.2rem !important;
+.block-container,
+[data-testid="stMainBlockContainer"],
+.stMainBlockContainer {
+    max-width: 1550px !important;
+    padding-top: 0.8rem !important;
+    padding-bottom: 1.2rem !important;
+    padding-left: 1.6rem !important;
+    padding-right: 1.6rem !important;
+}
+
+/* OPTIMIZED COMPACT VERTICAL SPACING */
+[data-testid="stVerticalBlock"] {
+    gap: 0.65rem !important;
+}
+
+[data-testid="stElementContainer"] {
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+[data-testid="stMarkdownContainer"] p {
+    margin-bottom: 0 !important;
 }
 
 /* SIDEBAR: Locked to precise 240px width */
@@ -313,14 +332,21 @@ iframe {
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
 }
 
-/* Unified Upload Panel & Dropzone */
-.cv-upload-panel {
-    background: #192438;
-    border: 1px solid #35445C;
-    border-radius: 12px;
-    padding: 18px 22px;
-    margin-bottom: 20px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+/* Card Container styling */
+[data-testid="stVerticalBlockBorderWrapper"] {
+    background: #192438 !important;
+    border: 1px solid #35445C !important;
+    border-radius: 12px !important;
+    padding: 16px 20px 14px !important;
+    margin-bottom: 10px !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25) !important;
+}
+
+[data-testid="stVerticalBlockBorderWrapper"] > div {
+    border: none !important;
+    background: transparent !important;
+    padding: 0 !important;
+    gap: 8px !important;
 }
 
 [data-testid="stFileUploader"] {
@@ -329,20 +355,24 @@ iframe {
     margin: 0 !important;
 }
 
+[data-testid="stFileUploader"] section {
+    margin: 0 !important;
+}
+
 [data-testid="stFileUploaderDropzone"] {
     background-color: #131C2E !important;
     border: 1.5px dashed #35445C !important;
     border-radius: 10px !important;
-    padding: 24px 20px !important;
+    padding: 20px 16px 16px !important;
     display: flex !important;
     flex-direction: column !important;
     align-items: center !important;
     justify-content: center !important;
     text-align: center !important;
-    gap: 8px !important;
+    gap: 6px !important;
     transition: all 0.2s ease !important;
     cursor: pointer !important;
-    min-height: 170px !important;
+    min-height: 155px !important;
 }
 
 [data-testid="stFileUploaderDropzone"]:hover {
@@ -353,13 +383,13 @@ iframe {
 [data-testid="stFileUploaderDropzone"]::before {
     content: "";
     display: block;
-    width: 48px;
-    height: 48px;
+    width: 44px;
+    height: 44px;
     margin: 0 auto 2px;
     background-repeat: no-repeat;
     background-position: center;
     background-size: contain;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 24 24' fill='none' stroke='%237157E8' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242'/%3E%3Cpath d='M12 12v9'/%3E%3Cpath d='m16 16-4-4-4 4'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='44' height='44' viewBox='0 0 24 24' fill='none' stroke='%237157E8' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242'/%3E%3Cpath d='M12 12v9'/%3E%3Cpath d='m16 16-4-4-4 4'/%3E%3C/svg%3E");
 }
 
 [data-testid="stFileUploaderDropzoneInstructions"] {
@@ -368,22 +398,22 @@ iframe {
     align-items: center !important;
     justify-content: center !important;
     text-align: center !important;
-    margin-bottom: 4px !important;
+    margin-bottom: 2px !important;
 }
 
 [data-testid="stFileUploaderDropzoneInstructions"]::before {
     content: "Drag and drop video or image here";
     display: block;
-    font-size: 15px;
+    font-size: 14.5px;
     font-weight: 700;
     color: #EDF2FA;
-    margin-bottom: 4px;
+    margin-bottom: 3px;
 }
 
 [data-testid="stFileUploaderDropzoneInstructions"]::after {
     content: "Supported: MP4, AVI, MOV, JPG, PNG";
     display: block;
-    font-size: 12px;
+    font-size: 11.5px;
     color: #A1AEC2;
     margin-bottom: 8px;
 }
@@ -402,8 +432,8 @@ iframe {
     color: #ffffff !important;
     border: none !important;
     border-radius: 20px !important;
-    padding: 7px 22px !important;
-    font-size: 13px !important;
+    padding: 6px 22px !important;
+    font-size: 12.5px !important;
     font-weight: 600 !important;
     box-shadow: 0 3px 12px rgba(113, 87, 232, 0.45) !important;
     transition: all 0.2s ease !important;
@@ -425,9 +455,9 @@ iframe {
     border: 1px solid #35445C !important;
     border-radius: 6px !important;
     color: #EDF2FA !important;
-    font-size: 12.5px !important;
+    font-size: 12px !important;
     font-weight: 500 !important;
-    padding: 6px 14px !important;
+    padding: 5px 14px !important;
     transition: all 0.15s ease !important;
 }
 .cv-sample-btn button:hover {
@@ -441,13 +471,13 @@ iframe {
     background: #192438;
     border: 1px solid #35445C;
     border-radius: 10px;
-    padding: 18px 20px;
+    padding: 14px 16px;
     display: flex;
     flex-direction: column;
     justify-content: flex-start;
     height: 100%;
-    min-height: 110px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+    min-height: 94px;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
     transition: border-color 0.2s ease, transform 0.2s ease;
 }
 .cv-capability-card:hover {
@@ -455,20 +485,20 @@ iframe {
     transform: translateY(-2px);
 }
 .cv-cap-icon {
-    font-size: 24px;
+    font-size: 20px;
     line-height: 1;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
 }
 .cv-cap-title {
-    font-size: 14px;
+    font-size: 13.5px;
     font-weight: 700;
     color: #EDF2FA;
-    margin-bottom: 4px;
+    margin-bottom: 3px;
 }
 .cv-cap-desc {
-    font-size: 12px;
+    font-size: 11.5px;
     color: #A1AEC2;
-    line-height: 1.45;
+    line-height: 1.4;
 }
 
 /* RESPONSIVE KPI CONTAINER (No Text Truncation) */
@@ -1413,7 +1443,6 @@ def render_analytics_section(record, settings):
                 </div>
                 ''', unsafe_allow_html=True)
 
-        st.markdown('<div style="height:12px;"></div>', unsafe_allow_html=True)
         d1, d2, d3, d4 = st.columns(4)
         with d1:
             st.download_button('📥 Download Annotated HD Video', path.read_bytes(), file_name=f"{Path(record['file_name']).stem}-annotated.mp4", mime='video/mp4', width='stretch')
@@ -1517,8 +1546,6 @@ def render_results(record):
             reset_session()
             st.rerun()
 
-    st.markdown('<div style="height:10px;"></div>', unsafe_allow_html=True)
-
     # 3. Four Analytics Tabs
     render_analytics_section(record, settings)
 
@@ -1532,83 +1559,80 @@ def render_empty_state():
         subtitle="Analyse recorded videos, define counting regions and monitor crowd occupancy and flow.",
     )
 
-    st.markdown('''
-    <div class="cv-upload-panel">
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
-        <div style="width:36px;height:36px;border-radius:8px;background:#202D42;border:1px solid #35445C;display:flex;align-items:center;justify-content:center;color:#7157E8;font-size:18px;">
-          ☁
-        </div>
-        <div>
-          <div style="font-size:15px;font-weight:700;color:#EDF2FA;line-height:1.2;">
-            Upload Recorded Footage
-          </div>
-          <div style="font-size:12px;color:#A1AEC2;margin-top:2px;">
-            Upload a campus video or image to begin crowd analysis.
-          </div>
-        </div>
-      </div>
-    ''', unsafe_allow_html=True)
-
-    uploaded = media_uploader()
-    if uploaded is not None:
-        file_size = uploaded.size
-        suffix = Path(uploaded.name).suffix.lower()
-        OUTPUTS.mkdir(parents=True, exist_ok=True)
-        session_dir = SESSIONS / st.session_state.session_id
-        session_dir.mkdir(parents=True, exist_ok=True)
-        source = session_dir / ('input' + suffix)
-        hasher = hashlib.sha256()
-        try:
-            with FileLock(str(OUTPUTS / '.dispatch.lock'), timeout=10):
-                check_storage_budget(OUTPUTS, file_size)
-                with open(source, 'wb') as dst:
-                    uploaded.seek(0)
-                    while chunk := uploaded.read(8 * 1024 * 1024):
-                        hasher.update(chunk)
-                        dst.write(chunk)
-            digest = hasher.hexdigest()
-            st.session_state.custom_video_source = str(source)
-            st.session_state.custom_file_name = uploaded.name
-            st.session_state.upload_hash = digest
-            st.session_state.pop('result', None)
-            st.rerun()
-        except Exception as exc:
-            if source.exists():
-                source.unlink(missing_ok=True)
-            st.error(str(exc))
-            st.stop()
-
-    st.markdown('<div style="height: 10px;"></div>', unsafe_allow_html=True)
-    col_act, col_priv = st.columns([1.1, 1.9])
-    with col_act:
-        st.markdown('<div class="cv-sample-btn">', unsafe_allow_html=True)
-        if st.button('📁 Load Sample Video', width='stretch'):
-            if DEMO_VIDEO.is_file():
-                raw = DEMO_VIDEO.read_bytes()
-                session_dir = SESSIONS / st.session_state.session_id
-                session_dir.mkdir(parents=True, exist_ok=True)
-                dest = session_dir / 'input.mp4'
-                dest.write_bytes(raw)
-                st.session_state.custom_video_source = str(dest)
-                st.session_state.custom_file_name = DEMO_VIDEO.name
-                st.session_state.upload_hash = hashlib.sha256(raw).hexdigest()
-                st.session_state.pop('result', None)
-                st.rerun()
-            else:
-                st.error('Bundled sample video not found on disk.')
-        st.markdown('</div>', unsafe_allow_html=True)
-    with col_priv:
+    with st.container(border=True):
         st.markdown('''
-        <div style="display:flex;align-items:center;height:100%;font-size:12px;color:#A1AEC2;gap:6px;padding-left:4px;">
-          <span style="color:#35D995;font-size:13px;">🔒</span>
-          <span><strong style="color:#EDF2FA;">Local Processing</strong> · Video inference runs locally on your machine.</span>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+          <div style="width:34px;height:34px;border-radius:8px;background:#202D42;border:1px solid #35445C;display:flex;align-items:center;justify-content:center;color:#7157E8;font-size:17px;flex-shrink:0;">
+            ☁
+          </div>
+          <div>
+            <div style="font-size:15px;font-weight:700;color:#EDF2FA;line-height:1.2;">
+              Upload Recorded Footage
+            </div>
+            <div style="font-size:12px;color:#A1AEC2;margin-top:2px;">
+              Upload a campus video or image to begin crowd analysis.
+            </div>
+          </div>
         </div>
         ''', unsafe_allow_html=True)
 
-    st.markdown('</div>', unsafe_allow_html=True)  # Close cv-upload-panel
+        uploaded = media_uploader()
+        if uploaded is not None:
+            file_size = uploaded.size
+            suffix = Path(uploaded.name).suffix.lower()
+            OUTPUTS.mkdir(parents=True, exist_ok=True)
+            session_dir = SESSIONS / st.session_state.session_id
+            session_dir.mkdir(parents=True, exist_ok=True)
+            source = session_dir / ('input' + suffix)
+            hasher = hashlib.sha256()
+            try:
+                with FileLock(str(OUTPUTS / '.dispatch.lock'), timeout=10):
+                    check_storage_budget(OUTPUTS, file_size)
+                    with open(source, 'wb') as dst:
+                        uploaded.seek(0)
+                        while chunk := uploaded.read(8 * 1024 * 1024):
+                            hasher.update(chunk)
+                            dst.write(chunk)
+                digest = hasher.hexdigest()
+                st.session_state.custom_video_source = str(source)
+                st.session_state.custom_file_name = uploaded.name
+                st.session_state.upload_hash = digest
+                st.session_state.pop('result', None)
+                st.rerun()
+            except Exception as exc:
+                if source.exists():
+                    source.unlink(missing_ok=True)
+                st.error(str(exc))
+                st.stop()
+
+        col_act, col_priv = st.columns([1.1, 1.9], vertical_alignment="center")
+        with col_act:
+            st.markdown('<div class="cv-sample-btn">', unsafe_allow_html=True)
+            if st.button('📁 Load Sample Video', width='stretch'):
+                if DEMO_VIDEO.is_file():
+                    raw = DEMO_VIDEO.read_bytes()
+                    session_dir = SESSIONS / st.session_state.session_id
+                    session_dir.mkdir(parents=True, exist_ok=True)
+                    dest = session_dir / 'input.mp4'
+                    dest.write_bytes(raw)
+                    st.session_state.custom_video_source = str(dest)
+                    st.session_state.custom_file_name = DEMO_VIDEO.name
+                    st.session_state.upload_hash = hashlib.sha256(raw).hexdigest()
+                    st.session_state.pop('result', None)
+                    st.rerun()
+                else:
+                    st.error('Bundled sample video not found on disk.')
+            st.markdown('</div>', unsafe_allow_html=True)
+        with col_priv:
+            st.markdown('''
+            <div style="display:flex;align-items:center;height:100%;font-size:12px;color:#A1AEC2;gap:6px;padding-left:4px;">
+              <span style="color:#35D995;font-size:13px;">🔒</span>
+              <span><strong style="color:#EDF2FA;">Local Processing</strong> · Video inference runs locally on your machine.</span>
+            </div>
+            ''', unsafe_allow_html=True)
 
     st.markdown('''
-    <div style="display:flex;align-items:center;gap:8px;font-size:15px;font-weight:700;color:#EDF2FA;margin-top:16px;margin-bottom:12px;">
+    <div style="display:flex;align-items:center;gap:8px;font-size:14.5px;font-weight:700;color:#EDF2FA;margin-top:6px;margin-bottom:8px;">
       <span style="font-size:16px;">📚</span>
       <span>CrowdVision Capabilities</span>
     </div>
