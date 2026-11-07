@@ -8,7 +8,7 @@ import time
 import uuid
 from filelock import FileLock, Timeout
 import config
-from src.services.storage import atomic_json, check_storage_budget
+from src.services.storage import atomic_json, check_storage_budget, safe_unlink
 
 ACTIVE_STATES=('queued','running','cancelling')
 
@@ -37,7 +37,7 @@ def start_job(run_dir, payload):
             if read_status(p.parent).get('state') in ACTIVE_STATES:
                 raise ValueError('Another analysis is running. Open its saved session or wait for it to finish.')
         check_storage_budget(root, 150*1024**2)
-        (run_dir/'cancel').unlink(missing_ok=True)
+        safe_unlink(run_dir/'cancel')
         atomic_json(run_dir/'job.json',payload)
         atomic_json(run_dir/'status.json',dict(state='queued',updated=time.time(),progress=0.,message='Starting analysis'))
         log=open(run_dir/'worker.log','w',encoding='utf-8')

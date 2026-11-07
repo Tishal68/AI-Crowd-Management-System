@@ -44,6 +44,52 @@ def safe_replace(src: Union[str, Path], dst: Union[str, Path], max_attempts: int
             raise
 
 
+def safe_unlink(path: Union[str, Path], retries: int = 10, delay: float = 0.02):
+    """
+    Safely remove a file, retrying on transient Windows file lock collisions.
+    Fails silently on final attempt rather than crashing the caller during cleanup.
+    """
+    p = Path(path)
+    if not p.exists():
+        return
+    for attempt in range(retries):
+        try:
+            p.unlink(missing_ok=True)
+            return
+        except (PermissionError, OSError):
+            if attempt < retries - 1:
+                time.sleep(delay * (1.15 ** attempt))
+                continue
+            pass
+
+
+def safe_rmtree(target: Union[str, Path], retries: int = 10, delay: float = 0.03):
+    """
+    Safely delete directory trees on Windows, handling read-only files and transient locks.
+    """
+    target_path = Path(target)
+    if not target_path.exists():
+        return
+
+    def _on_error(func, path, exc_info):
+        try:
+            import stat
+            os.chmod(path, stat.S_IWRITE)
+            func(path)
+        except Exception:
+            pass
+
+    for attempt in range(retries):
+        try:
+            shutil.rmtree(target_path, onerror=_on_error)
+            return
+        except (PermissionError, OSError):
+            if attempt < retries - 1:
+                time.sleep(delay * (1.15 ** attempt))
+                continue
+            shutil.rmtree(target_path, ignore_errors=True)
+
+
 def atomic_json(path, value):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -54,7 +100,7 @@ def atomic_json(path, value):
             f.flush()
         safe_replace(name, path)
     finally:
-        Path(name).unlink(missing_ok=True)
+        safe_unlink(name)
 
 
 def storage_bytes(path):
@@ -117,7 +163,7 @@ def clear_session(root, session_id):
     if target.parent != root or not session_id or target == root:
         raise ValueError('Invalid session path.')
     if target.exists():
-        shutil.rmtree(target)
+        safe_rmtree(target)
 
 
 def retain_run(session_dir, signature):
@@ -127,7 +173,7 @@ def retain_run(session_dir, signature):
     for path in root.iterdir():
         if path.is_dir() and not path.is_symlink() and re.fullmatch(r"[0-9a-f]{24}", path.name) and path.name != signature:
             if path.resolve().parent == root:
-                shutil.rmtree(path)
+                safe_rmtree(path)
 
 
 LEGACY_FOLDERS = ('streamlit_videos', 'streamlit_images', 'rtsp_recordings', '_uploads', 'csv', 'reports')
@@ -147,5 +193,5 @@ def clear_legacy_exports(outputs_root, folders):
             for path in target.iterdir():
                 if path.is_file() and not path.is_symlink():
                     removed += path.stat().st_size
-                    path.unlink()
+                    safe_unlink(path)
     return removed

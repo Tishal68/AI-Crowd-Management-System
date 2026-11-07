@@ -6,7 +6,7 @@ import shutil
 import subprocess
 import tempfile
 from typing import Optional
-from src.services.storage import safe_replace
+from src.services.storage import safe_replace, safe_unlink
 
 
 def ffmpeg_executable() -> str:
@@ -94,4 +94,4 @@ class CompactVideoWriter:
                 safe_replace(self.partial, self.path)
         finally:
             self.log.close()
-            self.partial.unlink(missing_ok=True)
+            safe_unlink(self.partial)

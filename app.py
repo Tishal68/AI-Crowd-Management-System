@@ -17,7 +17,7 @@ import streamlit as st
 from filelock import FileLock
 import config
 from src.core.scene import validate_polygon, validate_line
-from src.services.storage import storage_bytes, clear_session, session_inventory, check_storage_budget
+from src.services.storage import storage_bytes, clear_session, session_inventory, check_storage_budget, safe_unlink
 from src.services.jobs import start_job, read_status, cancel_job, ACTIVE_STATES
 from src.services.exports import csv_bytes
 from src.services.report_generator import generate_pdf_report
@@ -1851,7 +1851,7 @@ def render_empty_state():
                 st.rerun()
             except Exception as exc:
                 if source.exists():
-                    source.unlink(missing_ok=True)
+                    safe_unlink(source)
                 st.error(str(exc))
                 st.stop()
 

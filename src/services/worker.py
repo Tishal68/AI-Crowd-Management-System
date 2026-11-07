@@ -11,7 +11,7 @@ from filelock import FileLock
 import config
 from src.core.detector import load_model, run_detection
 from src.core.video_processor import process_video, AnalysisCancelled
-from src.services.storage import atomic_json, check_storage_budget, safe_replace
+from src.services.storage import atomic_json, check_storage_budget, safe_replace, safe_unlink
 from src.utils.helpers import get_crowd_level
 
 
@@ -90,7 +90,7 @@ def run(run_dir, preloaded_model=None):
                           forward_crossings=0,reverse_crossings=0,source_duration=0,source_fps=None,sample_fps=None,
                           zones=zones,heatmap=heatmap)
             if cancelled():
-                output.unlink(missing_ok=True)
+                safe_unlink(output)
                 raise AnalysisCancelled('Analysis cancelled.')
             record=dict(data,signature=run_dir.name,id=run_dir.name,file_name=job['file_name'],
                         media_type=job['media_type'],annotated_path=str(output),source_path=job['source_path'],
@@ -104,6 +104,6 @@ def run(run_dir, preloaded_model=None):
     except Exception as exc:
         status('failed',error=str(exc))
     finally:
-        (run_dir/'preview.tmp.jpg').unlink(missing_ok=True)
+        safe_unlink(run_dir/'preview.tmp.jpg')
 
 if __name__=='__main__': run(sys.argv[1])
