@@ -38,14 +38,13 @@ def configure_stream_backend():
 
 class StreamCapture:
     """
-    Threaded, non-blocking RTSP / camera capture.
-    
+    Threaded, non-blocking RTSP / camera capture with fresh frame validation.
+
     Standard cv2.VideoCapture buffers 30+ frames internally. When YOLO detection takes
     50-100ms per frame, naive Capture falls behind real-time by seconds or minutes.
-    
-    StreamCapture runs a lightweight daemon thread continuously draining the network
-    buffer and holding the single freshest frame in memory. When the inference loop
-    calls read(), it gets the live camera frame with near-zero latency (<30ms).
+
+    StreamCapture runs a lightweight daemon thread continuously draining network buffers
+    and holding the single freshest frame in memory with capture timestamp verification.
     """
 
     def __init__(
@@ -53,11 +52,13 @@ class StreamCapture:
         source: Union[str, int],
         reconnect_timeout: float = 15.0,
         target_fps: Optional[float] = None,
+        stale_timeout: float = 1.0,
     ):
         configure_stream_backend()
         self.source = normalize_stream_source(source)
         self.reconnect_timeout = reconnect_timeout
         self.target_fps = target_fps
+        self.stale_timeout = stale_timeout
 
         self.cap: Optional[cv2.VideoCapture] = None
         self._lock = threading.Lock()
@@ -66,6 +67,7 @@ class StreamCapture:
 
         self._latest_frame: Optional[np.ndarray] = None
         self._latest_pts: float = 0.0
+        self._last_delivered_pts: float = 0.0
         self._frame_counter: int = 0
         self._is_opened = False
         self._last_read_success_time = time.time()
@@ -84,6 +86,14 @@ class StreamCapture:
                     self.cap.release()
                 except Exception:
                     pass
+                self.cap = None
+
+            # Reset frame state and timestamps on connection / reconnection
+            self._latest_frame = None
+            self._latest_pts = 0.0
+            self._last_delivered_pts = 0.0
+            self._is_opened = False
+
             self.cap = cv2.VideoCapture(self.source, cv2.CAP_FFMPEG if isinstance(self.source, str) else cv2.CAP_ANY)
             if not self.cap.isOpened():
                 # Fallback for webcam or standard backend
@@ -119,8 +129,10 @@ class StreamCapture:
                     self._last_read_success_time = time.time()
                     return True
 
-        self._is_opened = False
-        return False
+            self._is_opened = False
+            self._latest_frame = None
+            self._latest_pts = 0.0
+            return False
 
     def start(self):
         if self._running:
@@ -131,70 +143,111 @@ class StreamCapture:
 
     def _worker(self):
         while self._running:
-            if not self._is_opened or self.cap is None:
-                # Attempt auto-reconnect if dropped
+            cap_handle = None
+            is_open = False
+            with self._lock:
+                if not self._running:
+                    break
+                cap_handle = self.cap
+                is_open = self._is_opened
+
+            if not is_open or cap_handle is None:
+                # Stream disconnected: ensure stale frame is cleared
+                with self._lock:
+                    self._latest_frame = None
+                    self._latest_pts = 0.0
                 if time.time() - self._last_read_success_time > self.reconnect_timeout:
-                    time.sleep(1.0)
+                    time.sleep(0.5)
                     continue
-                time.sleep(0.5)
+                time.sleep(0.2)
                 self._connect()
                 continue
 
             try:
-                ret, frame = self.cap.read()
+                ret, frame = cap_handle.read()
             except Exception:
                 ret, frame = False, None
 
             now = time.perf_counter()
-            if ret and frame is not None:
+            if ret and frame is not None and self._running:
                 with self._lock:
                     self._latest_frame = frame
                     self._latest_pts = now
                     self._frame_counter += 1
                     self._last_read_success_time = time.time()
             else:
-                # Stream stalled or connection lost
-                if time.time() - self._last_read_success_time > 3.0:
-                    # Trigger reconnection
-                    self._is_opened = False
+                # Stream stalled or connection lost: clear stale frames
+                with self._lock:
+                    if time.time() - self._last_read_success_time > 2.0:
+                        self._is_opened = False
+                        self._latest_frame = None
+                        self._latest_pts = 0.0
                 time.sleep(0.01)
 
-    def read(self, timeout: float = 2.0) -> Tuple[bool, Optional[np.ndarray], float]:
+    def read(
+        self,
+        timeout: float = 2.0,
+        max_age: Optional[float] = None,
+        require_new: bool = True,
+    ) -> Tuple[bool, Optional[np.ndarray], float]:
         """
         Return (success, frame, timestamp).
-        Always delivers the freshest frame from the camera with zero buffer latency.
+        Verifies frame freshness using capture timestamp against max_age (default: self.stale_timeout).
+        If require_new=True, ensures caller does not receive the same frame repeatedly.
+        Returns (False, None, 0.0) if frame is stale, feed is disconnected, or timeout expires.
         """
+        allowed_age = max_age if max_age is not None else self.stale_timeout
         deadline = time.time() + timeout
-        while time.time() < deadline:
+
+        while time.time() <= deadline:
             with self._lock:
-                if self._latest_frame is not None:
-                    return True, self._latest_frame.copy(), self._latest_pts
+                if not self._running or not self._is_opened:
+                    self._latest_frame = None
+                    self._latest_pts = 0.0
+                elif self._latest_frame is not None:
+                    age = time.perf_counter() - self._latest_pts
+                    is_fresh = age <= allowed_age
+                    is_new = (self._latest_pts > self._last_delivered_pts) if require_new else True
+
+                    if is_fresh and is_new:
+                        self._last_delivered_pts = self._latest_pts
+                        return True, self._latest_frame.copy(), self._latest_pts
+                    elif not is_fresh:
+                        # Invalidate stale frame
+                        self._latest_frame = None
+                        self._latest_pts = 0.0
+
             time.sleep(0.005)
+
         return False, None, 0.0
 
     def isOpened(self) -> bool:
-        return self._is_opened or (self.cap is not None and self.cap.isOpened())
+        with self._lock:
+            return self._is_opened and (self.cap is not None and self.cap.isOpened())
 
     def get(self, prop_id: int):
-        if prop_id == cv2.CAP_PROP_FRAME_WIDTH:
-            return self.width
-        if prop_id == cv2.CAP_PROP_FRAME_HEIGHT:
-            return self.height
-        if prop_id == cv2.CAP_PROP_FPS:
-            return self.fps
-        if prop_id == cv2.CAP_PROP_FRAME_COUNT:
-            return -1
-        if self.cap is not None:
-            try:
-                return self.cap.get(prop_id)
-            except Exception:
-                pass
+        with self._lock:
+            if prop_id == cv2.CAP_PROP_FRAME_WIDTH:
+                return self.width
+            if prop_id == cv2.CAP_PROP_FRAME_HEIGHT:
+                return self.height
+            if prop_id == cv2.CAP_PROP_FPS:
+                return self.fps
+            if prop_id == cv2.CAP_PROP_FRAME_COUNT:
+                return -1
+            if self.cap is not None:
+                try:
+                    return self.cap.get(prop_id)
+                except Exception:
+                    pass
         return 0
 
     def release(self):
         self._running = False
+        # Wait for worker thread to terminate completely BEFORE releasing OpenCV capture
         if self._thread and self._thread.is_alive():
-            self._thread.join(timeout=1.0)
+            if threading.current_thread() != self._thread:
+                self._thread.join(timeout=2.0)
         with self._lock:
             if self.cap is not None:
                 try:
@@ -203,6 +256,8 @@ class StreamCapture:
                     pass
                 self.cap = None
             self._is_opened = False
+            self._latest_frame = None
+            self._latest_pts = 0.0
 
     def __enter__(self):
         return self

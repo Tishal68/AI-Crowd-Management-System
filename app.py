@@ -1252,15 +1252,12 @@ if page == 'Live Monitoring':
                 consecutive_drops = 0
                 exec_device = st.session_state.get('inference_device', 'cpu')
 
-                for _ in range(1200):
-                    if not st.session_state.get('rtsp_active', True):
-                        break
-
-                    ok, frame, _ = capture.read(timeout=0.5)
+                while st.session_state.get('rtsp_active', False):
+                    ok, frame, pts = capture.read(timeout=0.5, max_age=1.5, require_new=True)
                     if not ok or frame is None:
                         consecutive_drops += 1
-                        if consecutive_drops > 10:
-                            st.warning("⚠️ Live camera stream disconnected or timed out.")
+                        if consecutive_drops >= 20:
+                            st.error(f"⚠️ Live camera stream disconnected from {redact_camera_uri(active_src)}.")
                             break
                         time.sleep(0.04)
                         continue
@@ -1280,8 +1277,9 @@ if page == 'Live Monitoring':
                                 native_head_class=native
                             )
                         except Exception as inf_e:
+                            clean_inf_err = redact_sensitive(str(inf_e))
                             if exec_device != 'cpu':
-                                st.warning(f"Inference device {exec_device} failed ({inf_e}). Falling back to CPU.")
+                                st.warning(f"Inference device {exec_device} failed ({clean_inf_err}). Falling back to CPU.")
                                 exec_device = 'cpu'
                                 st.session_state['inference_device'] = 'cpu'
                                 dets = detect_heads_in_frame(
@@ -1294,7 +1292,7 @@ if page == 'Live Monitoring':
                                     native_head_class=native
                                 )
                             else:
-                                raise inf_e
+                                raise RuntimeError(f"Inference failure: {clean_inf_err}") from inf_e
 
                         dets = in_zone(dets, frame.shape, polygon)
                         if tracker:
@@ -1317,10 +1315,15 @@ if page == 'Live Monitoring':
                         try:
                             live_writer.write(annotated)
                         except Exception as wrt_e:
-                            st.warning(f"Video writer frame write failed: {wrt_e}. Halting recording.")
-                            live_writer.close(success=True)
+                            clean_wrt_err = redact_sensitive(str(wrt_e))
+                            st.warning(f"Video writer frame write failed: {clean_wrt_err}. Recording aborted.")
+                            try:
+                                live_writer.close(success=False)
+                            except Exception:
+                                pass
                             live_writer = None
                             register_active_stream(writer=None)
+                            st.session_state._live_writer = None
 
                     with stats_slot.container():
                         m1, m2, m3, m4 = st.columns(4)
@@ -1335,14 +1338,15 @@ if page == 'Live Monitoring':
                     time.sleep(0.01)
 
             except Exception as loop_e:
-                st.error(f"Stream error encountered: {loop_e}")
+                clean_loop_err = redact_sensitive(str(loop_e))
+                st.error(f"Stream error encountered: {clean_loop_err}")
             finally:
                 release_global_stream()
                 st.session_state.rtsp_active = False
                 st.session_state._live_capture = None
                 st.session_state._live_writer = None
 
-                if live_record_path and live_record_path.is_file():
+                if live_record_path and live_record_path.is_file() and live_record_path.stat().st_size > 0:
                     st.success(f"Recorded video saved successfully ({mb(live_record_path.stat().st_size)}).")
         else:
             video_slot.info('Live stream is idle. Select source and click "Start Stream" to monitor.')
