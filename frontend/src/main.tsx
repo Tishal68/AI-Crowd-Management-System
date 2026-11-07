@@ -13,6 +13,7 @@ import {
   Layers,
   Lock,
   LogOut,
+  Play,
   Plus,
   ScanLine,
   Search,
@@ -365,10 +366,23 @@ function App() {
         </div>
 
         <div className="cv-header-center">
-          <div className="cv-workspace-pill">
+          <button
+            className="cv-workspace-pill"
+            aria-label="Campus Operations workspace"
+            onClick={() => navigate("Review Footage")}
+          >
             <ScanLine size={15} />
             <span>Operations</span>
-          </div>
+          </button>
+          <button
+            className={`cv-model-system-pill ${settingsOpen ? "active" : ""}`}
+            aria-label="Open model and system configuration"
+            onClick={() => setSettingsOpen(!settingsOpen)}
+            aria-expanded={settingsOpen}
+          >
+            <Settings2 size={15} />
+            <span>Model & System</span>
+          </button>
         </div>
 
         <div className="cv-header-right">
@@ -376,16 +390,6 @@ function App() {
             <span className="cv-status-dot" />
             <span>System Ready</span>
           </div>
-
-          <button
-            className="cv-settings-btn"
-            aria-label="Open settings"
-            onClick={() => setSettingsOpen(!settingsOpen)}
-            aria-expanded={settingsOpen}
-          >
-            <Settings2 size={16} />
-            <span>Settings</span>
-          </button>
         </div>
       </header>
 
@@ -393,9 +397,9 @@ function App() {
       <div className="cv-subnav-wrap">
         <nav className="cv-subnav" aria-label="Secondary navigation">
           {[
-            { id: "Review Footage" as const, label: "Review Footage", icon: Film },
+            { id: "Review Footage" as const, label: "Review Footage", icon: Play },
             { id: "Live Monitoring" as const, label: "Live Monitoring", icon: Video },
-            { id: "Activity & History" as const, label: "Activity & History", icon: FolderOpen },
+            { id: "Activity & History" as const, label: "Activity & History", icon: Layers },
             { id: "Reports" as const, label: "Reports", icon: FileText },
           ].map((item) => {
             const Icon = item.icon;
