@@ -1,6 +1,6 @@
 """
 High-definition interactive Plotly charts and operational analytics for CrowdVision.
-Engineered to strictly match the dark navy enterprise design system.
+Engineered to strictly match the warm-white and burnt-orange design system.
 """
 from __future__ import annotations
 import math
@@ -9,22 +9,22 @@ import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-# Enterprise Design System Palette
-# Modern Enterprise Charcoal & Emerald Palette
-MAIN_BG = '#171A18'
-CARD_BG = '#292E2A'
-SURFACE_BG = '#343B35'
-BORDER_COLOR = '#454B43'
-PRIMARY = '#087F5B'
-PURPLE = '#087F5B'  # Backwards compatibility alias
-SECONDARY = '#B87345'
-CYAN = '#B87345'    # Backwards compatibility alias
-EMERALD = '#3D9970' # Forest green success
-AMBER = '#D9A441'   # Warm amber highlight
-WARNING = '#D98236' # Burnt orange warning
-CORAL = '#C65D62'   # Muted crimson critical
-TEXT_PRIMARY = '#F2F0E8'
-TEXT_SECONDARY = '#B6B8AE'
+# Enterprise Warm-White & Burnt-Orange Design System Palette
+MAIN_BG = '#F7F5F0'
+CARD_BG = '#FFFFFF'
+SURFACE_BG = '#F0EEE9'
+BORDER_COLOR = '#E7E3DC'
+PRIMARY = '#E87532'
+PURPLE = '#E87532'   # Backwards compatibility alias
+SECONDARY = '#D99528'
+CYAN = '#3D78A8'     # Backwards compatibility alias
+EMERALD = '#23865B'  # Forest green success
+AMBER = '#D99528'    # Warm amber highlight
+WARNING = '#D99528'  # Burnt amber warning
+CORAL = '#D94A4A'    # Muted crimson danger
+TEXT_PRIMARY = '#252525'
+TEXT_SECONDARY = '#777777'
+TEXT_MUTED = '#999999'
 
 
 def create_occupancy_timeline(
@@ -37,10 +37,10 @@ def create_occupancy_timeline(
     """
     Generate the flagship 'Occupancy Over Time' chart matching the reference UI.
     Features:
-    - Purple spline curve with markers (#7157E8)
-    - Dashed capacity threshold (#F5B942)
-    - Enterprise dark navy canvas (#192438)
-    - Clean 'Time (s)' and 'People' axes
+    - Burnt orange spline curve with markers (#E87532)
+    - Dashed capacity threshold (#D99528)
+    - Clean warm-white canvas (#FFFFFF)
+    - Crisp 'Time (s)' and 'People' axes
     """
     fig = go.Figure()
 
@@ -60,7 +60,7 @@ def create_occupancy_timeline(
     fig.add_hrect(
         y0=capacity,
         y1=y_max,
-        fillcolor="rgba(198, 93, 98, 0.08)",
+        fillcolor="rgba(217, 74, 74, 0.08)",
         line_width=0,
     )
 
@@ -80,9 +80,9 @@ def create_occupancy_timeline(
         y=counts,
         mode='lines+markers',
         name='Occupancy',
-        line=dict(color=PURPLE, width=2.5, shape='spline', smoothing=0.8),
+        line=dict(color=PRIMARY, width=2.5, shape='spline', smoothing=0.8),
         marker=dict(
-            color=PURPLE,
+            color=PRIMARY,
             size=5,
             symbol='circle',
             line=dict(color='#ffffff', width=1)
@@ -103,14 +103,14 @@ def create_occupancy_timeline(
         arrowhead=2,
         arrowsize=1,
         arrowwidth=2,
-        arrowcolor='#ffffff',
+        arrowcolor=PRIMARY,
         ax=0,
         ay=-32,
-        bgcolor=SURFACE_BG,
+        bgcolor='#FFFFFF',
         bordercolor=PRIMARY,
         borderwidth=1.5,
         borderpad=4,
-        font=dict(color='#ffffff', size=11, family='Inter, system-ui'),
+        font=dict(color=TEXT_PRIMARY, size=11, family='Inter, system-ui'),
     )
 
     fig.update_layout(
@@ -132,7 +132,7 @@ def create_occupancy_timeline(
             title=dict(text="Time (s)", font=dict(size=12, color=TEXT_SECONDARY)),
             tickfont=dict(size=11, color=TEXT_SECONDARY),
             showgrid=True,
-            gridcolor="rgba(255, 255, 255, 0.05)",
+            gridcolor="rgba(0, 0, 0, 0.05)",
             zeroline=False,
             showline=True,
             linecolor=BORDER_COLOR,
@@ -141,7 +141,7 @@ def create_occupancy_timeline(
             title=dict(text="People", font=dict(size=12, color=TEXT_SECONDARY)),
             tickfont=dict(size=11, color=TEXT_SECONDARY),
             showgrid=True,
-            gridcolor="rgba(255, 255, 255, 0.05)",
+            gridcolor="rgba(0, 0, 0, 0.05)",
             zeroline=False,
             showline=True,
             linecolor=BORDER_COLOR,
@@ -158,10 +158,10 @@ def create_flow_dynamics_chart(
     """
     Generate the 'Entry vs Exit Flow' bar chart matching the reference UI.
     Features:
-    - Entry bar in emerald green (#35D995)
-    - Exit bar in coral red (#F36B78)
+    - Entry bar in forest green (#23865B)
+    - Exit bar in crimson red (#D94A4A)
     - Clean value labels atop each bar
-    - Exact card background (#192438)
+    - Crisp white card background (#FFFFFF)
     """
     fig = go.Figure()
 
@@ -176,7 +176,7 @@ def create_flow_dynamics_chart(
         y=values,
         marker=dict(
             color=colors,
-            line=dict(color='rgba(255, 255, 255, 0.1)', width=1),
+            line=dict(color=BORDER_COLOR, width=1),
             cornerradius=4,
         ),
         text=[str(v) for v in values],
@@ -203,7 +203,7 @@ def create_flow_dynamics_chart(
             title=dict(text="Count", font=dict(size=12, color=TEXT_SECONDARY)),
             tickfont=dict(size=11, color=TEXT_SECONDARY),
             showgrid=True,
-            gridcolor="rgba(255, 255, 255, 0.05)",
+            gridcolor="rgba(0, 0, 0, 0.05)",
             zeroline=False,
             showline=True,
             linecolor=BORDER_COLOR,
@@ -292,11 +292,11 @@ def create_density_heatmap_fig(density_matrix: Optional[np.ndarray] = None) -> g
     fig.add_trace(go.Heatmap(
         z=density_matrix,
         colorscale=[
-            [0.0, '#171A18'],
-            [0.25, '#292E2A'],
-            [0.5, '#087F5B'],
-            [0.75, '#B87345'],
-            [1.0, '#D9A441'],
+            [0.0, '#F7F5F0'],
+            [0.25, '#F0EEE9'],
+            [0.5, '#E87532'],
+            [0.75, '#D99528'],
+            [1.0, '#D94A4A'],
         ],
         colorbar=dict(
             title=dict(text="Density (heads/m²)", font=dict(size=10, color=TEXT_SECONDARY)),
@@ -352,7 +352,7 @@ def create_events_timeline_fig(events: List[dict], duration: float = 11.2, capac
             title=dict(text="Time into footage (seconds)", font=dict(size=11, color=TEXT_SECONDARY)),
             tickfont=dict(size=10, color=TEXT_SECONDARY),
             showgrid=True,
-            gridcolor="rgba(255, 255, 255, 0.05)",
+            gridcolor="rgba(0, 0, 0, 0.05)",
             range=[0, max(duration, 12)],
         ),
         yaxis=dict(
