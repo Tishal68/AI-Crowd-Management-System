@@ -86,11 +86,17 @@ html, body, [class*="css"] {
 [data-testid="stMainBlockContainer"],
 .stMainBlockContainer {
     max-width: 1560px !important;
-    padding-top: 0 !important;
+    padding-top: 12px !important;
     margin-top: 0 !important;
     padding-bottom: 1.5rem !important;
     padding-left: 1.5rem !important;
     padding-right: 1.5rem !important;
+}
+
+/* RESPONSIVE LAYOUT & OVERFLOW HARDENING */
+html, body, [data-testid="stAppViewContainer"], .stApp {
+    overflow-x: hidden !important;
+    max-width: 100vw !important;
 }
 
 [data-testid="stAppViewContainer"],
@@ -137,26 +143,29 @@ div[data-testid="stSidebarCollapsedControl"],
     display: flex;
     align-items: center;
     gap: 12px;
-    padding-top: 4px;
+    height: 40px;
+    padding: 0;
+    margin: 0;
 }
 .cv-top-brand-icon {
-    width: 36px;
-    height: 36px;
-    border-radius: 8px;
+    width: 38px;
+    height: 38px;
+    border-radius: 9px;
     background: linear-gradient(135deg, var(--cv-primary) 0%, var(--cv-warning) 100%);
     display: flex;
     align-items: center;
     justify-content: center;
     color: #ffffff;
-    font-size: 17px;
+    font-size: 18px;
     box-shadow: 0 1px 3px rgba(191, 85, 34, 0.25);
+    flex-shrink: 0;
 }
 .cv-top-brand-title {
-    font-size: 17.5px;
+    font-size: 18px;
     font-weight: 700;
     color: #111827;
-    letter-spacing: -0.2px;
-    line-height: 1.1;
+    letter-spacing: -0.25px;
+    line-height: 1.15;
 }
 .cv-top-brand-subtitle {
     font-size: 11.5px;
@@ -170,7 +179,7 @@ div[data-testid="stSidebarCollapsedControl"],
     background: var(--cv-success-bg);
     border: 1px solid var(--cv-success-border);
     border-radius: 20px;
-    padding: 0 12px;
+    padding: 0 14px;
     display: inline-flex;
     align-items: center;
     gap: 7px;
@@ -182,8 +191,8 @@ div[data-testid="stSidebarCollapsedControl"],
     white-space: nowrap;
 }
 .cv-status-dot {
-    width: 7px;
-    height: 7px;
+    width: 7.5px;
+    height: 7.5px;
     border-radius: 50%;
     background: var(--cv-success);
 }
@@ -369,10 +378,45 @@ button[type="secondary"]:hover *,
     color: #111827 !important;
 }
 
+/* PRIMARY NAVIGATION BUTTONS DEDICATED STYLING */
+.cv-nav-spacer {
+    height: 14px;
+}
+.cv-nav-marker {
+    display: none !important;
+}
+[data-testid="stVerticalBlock"]:has(.cv-nav-marker) {
+    gap: 0 !important;
+}
+[data-testid="stVerticalBlock"]:has(.cv-nav-marker) [data-testid="stHorizontalBlock"] {
+    gap: 16px !important;
+    align-items: stretch !important;
+}
+[data-testid="stVerticalBlock"]:has(.cv-nav-marker) [data-testid="column"] {
+    width: 50% !important;
+    flex: 1 1 50% !important;
+}
+[data-testid="stVerticalBlock"]:has(.cv-nav-marker) button {
+    min-height: 44px !important;
+    height: 44px !important;
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.2px !important;
+    border-radius: var(--cv-radius-md) !important;
+    padding: 0 24px !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+    transition: all 0.16s ease !important;
+    width: 100% !important;
+}
+[data-testid="stVerticalBlock"]:has(.cv-nav-marker) button:hover {
+    transform: translateY(-1px) !important;
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.08) !important;
+}
+
 .cv-nav-divider {
     border-bottom: 1px solid var(--cv-border);
-    margin-top: 14px;
-    margin-bottom: 24px;
+    margin-top: 16px;
+    margin-bottom: 22px;
 }
 
 /* DISABLE & HIDE DEPLOY BUTTON AND STREAMLIT HEADER CHROME */
@@ -542,9 +586,39 @@ iframe {
         grid-template-columns: repeat(4, minmax(0, 1fr));
     }
 }
-@media (max-width: 880px) {
+@media (max-width: 1200px) {
+    .block-container,
+    [data-testid="stMainBlockContainer"],
+    .stMainBlockContainer {
+        padding-left: 1.25rem !important;
+        padding-right: 1.25rem !important;
+    }
+}
+@media (max-width: 960px) {
+    .cv-top-brand-subtitle {
+        display: none !important;
+    }
     .kpi-container {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    }
+}
+@media (max-width: 768px) {
+    .block-container,
+    [data-testid="stMainBlockContainer"],
+    .stMainBlockContainer {
+        padding-left: 0.75rem !important;
+        padding-right: 0.75rem !important;
+    }
+    [data-testid="stVerticalBlock"]:has(.cv-nav-marker) [data-testid="stHorizontalBlock"] {
+        flex-direction: column !important;
+        gap: 10px !important;
+    }
+    [data-testid="stVerticalBlock"]:has(.cv-nav-marker) [data-testid="column"] {
+        width: 100% !important;
+        flex: 1 1 100% !important;
+    }
+    .kpi-container {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
     }
 }
 
@@ -867,8 +941,8 @@ st.session_state['_prev_test_radio'] = test_radio
 # TOP NAVIGATION (Level 1 Header & Level 2 Horizontal Secondary)
 # ---------------------------------------------------------
 def render_top_navigation():
-    # 1. Primary Top Header Bar (Controls pushed flush right)
-    c_brand, c_controls = st.columns([2.75, 1.25], vertical_alignment="center")
+    # 1. Primary Top Header Bar (Balanced spacing & aligned vertically)
+    c_brand, c_controls = st.columns([2.6, 1.4], vertical_alignment="center")
 
     with c_brand:
         st.markdown('''
@@ -882,7 +956,7 @@ def render_top_navigation():
         ''', unsafe_allow_html=True)
 
     with c_controls:
-        c_status, c_popover = st.columns([1.05, 0.95], vertical_alignment="center")
+        c_status, c_popover = st.columns([1.1, 0.9], gap="small", vertical_alignment="center")
         with c_status:
             import torch
             has_cuda = torch.cuda.is_available()
@@ -900,7 +974,7 @@ def render_top_navigation():
                 status_color = "#DC2626"
 
             st.markdown(f'''
-            <div style="display:flex;justify-content:flex-end;">
+            <div style="display:flex;justify-content:flex-end;align-items:center;height:40px;">
               <div class="cv-top-status-badge">
                 <span class="cv-status-dot" style="background:{status_color};box-shadow:0 0 8px {status_color};"></span>
                 <span>{status_text}</span>
@@ -957,8 +1031,8 @@ def render_top_navigation():
                     reset_session()
                     st.rerun()
 
-    # 2. Primary Navigation (Review Footage & Live Monitoring with equal visual weight)
-    st.markdown('<div style="height:12px;"></div>', unsafe_allow_html=True)
+    # 2. Primary Navigation (Review Footage & Live Monitoring with equal visual weight and breathing room)
+    st.markdown('<div class="cv-nav-spacer"></div>', unsafe_allow_html=True)
     curr_s = st.session_state.get('secondary_nav', 'Review Footage')
     if curr_s not in ('Review Footage', 'Live Monitoring', 'Model Lab', 'Saved sessions'):
         curr_s = 'Review Footage'
@@ -969,16 +1043,18 @@ def render_top_navigation():
         ('📹  Live Monitoring', 'Live Monitoring'),
     ]
 
-    s_cols = st.columns(2)
-    for i, (label, val) in enumerate(sec_items):
-        with s_cols[i]:
-            is_active = (curr_s == val)
-            if st.button(label, key=f'btn_sec_{val}', type='primary' if is_active else 'secondary', width='stretch'):
-                if curr_s != val:
-                    release_global_stream()
-                    st.session_state['rtsp_active'] = False
-                st.session_state['secondary_nav'] = val
-                st.rerun()
+    with st.container():
+        st.markdown('<span class="cv-nav-marker"></span>', unsafe_allow_html=True)
+        s_cols = st.columns(2, gap="medium")
+        for i, (label, val) in enumerate(sec_items):
+            with s_cols[i]:
+                is_active = (curr_s == val)
+                if st.button(label, key=f'btn_sec_{val}', type='primary' if is_active else 'secondary', width='stretch'):
+                    if curr_s != val:
+                        release_global_stream()
+                        st.session_state['rtsp_active'] = False
+                    st.session_state['secondary_nav'] = val
+                    st.rerun()
 
     st.markdown('<div class="cv-nav-divider"></div>', unsafe_allow_html=True)
 
@@ -1295,10 +1371,16 @@ if page == 'Live Monitoring':
 
     saved_cams = load_camera_registry()
 
-    c_vid, c_side = st.columns([2.3, 1])
+    c_vid, c_side = st.columns([2.2, 1.0], gap="medium")
 
     with c_side:
-        st.markdown('### Stream Configuration')
+        st.markdown('''
+        <div class="cv-panel-card" style="margin-bottom:8px;padding:12px 14px;">
+          <div style="display:flex;align-items:center;gap:8px;font-size:14.5px;font-weight:700;color:#111827;">
+            <span>⚙</span> Stream Configuration
+          </div>
+        </div>
+        ''', unsafe_allow_html=True)
         feed_options = []
         if saved_cams:
             feed_options.append('Saved Campus Camera')
@@ -1882,7 +1964,7 @@ def render_results(record):
     render_kpi_section(record, settings)
 
     # 2. Main Two-Column Workspace (Left ~68%, Right ~32%)
-    c_vid, c_cfg = st.columns([2.15, 1.0])
+    c_vid, c_cfg = st.columns([2.15, 1.0], gap="medium")
     with c_vid:
         st.markdown(f'''
         <div class="cv-video-meta">
@@ -2023,7 +2105,7 @@ def render_empty_state():
     </div>
     ''', unsafe_allow_html=True)
 
-    c1, c2, c3 = st.columns(3)
+    c1, c2, c3 = st.columns(3, gap="medium")
     with c1:
         st.markdown('''
         <div class="cv-capability-card">
@@ -2131,7 +2213,7 @@ with col_h2:
         st.rerun()
 
 # Main Two-Column Workspace Layout (Left ~68%, Right ~32%)
-col_left, col_right = st.columns([2.15, 1.0])
+col_left, col_right = st.columns([2.15, 1.0], gap="medium")
 
 with col_left:
     st.markdown(f'''
