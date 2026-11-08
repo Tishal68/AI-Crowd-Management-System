@@ -104,7 +104,7 @@ section.main {
 
 /* OPTIMIZED COMPACT VERTICAL SPACING */
 [data-testid="stVerticalBlock"] {
-    gap: 0.65rem !important;
+    gap: 0.75rem !important;
 }
 
 [data-testid="stElementContainer"] {
@@ -371,8 +371,8 @@ button[type="secondary"]:hover *,
 
 .cv-nav-divider {
     border-bottom: 1px solid var(--cv-border);
-    margin-top: 6px;
-    margin-bottom: 14px;
+    margin-top: 14px;
+    margin-bottom: 24px;
 }
 
 /* DISABLE & HIDE DEPLOY BUTTON AND STREAMLIT HEADER CHROME */
@@ -438,22 +438,23 @@ iframe {
     align-items: flex-end;
     justify-content: space-between;
     border-bottom: 1px solid var(--cv-border);
-    padding-bottom: 10px;
-    margin-bottom: 14px;
+    padding-bottom: 12px;
+    margin-bottom: 22px;
 }
 .cv-page-title {
     font-size: 19px;
     font-weight: 700;
     color: #111827;
     letter-spacing: -0.3px;
-    line-height: 1.2;
+    line-height: 1.25;
     display: flex;
     align-items: center;
 }
 .cv-page-sub {
-    font-size: 12px;
+    font-size: 12.5px;
     color: var(--cv-text-secondary);
-    margin-top: 4px;
+    margin-top: 6px;
+    line-height: 1.4;
 }
 
 /* Card Container styling */
@@ -461,8 +462,8 @@ iframe {
     background: var(--cv-surface) !important;
     border: 1px solid var(--cv-border) !important;
     border-radius: var(--cv-radius-lg) !important;
-    padding: 18px 22px 16px !important;
-    margin-bottom: 12px !important;
+    padding: 22px 24px 20px !important;
+    margin-bottom: 22px !important;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03) !important;
 }
 
@@ -532,8 +533,8 @@ iframe {
 .kpi-container {
     display: grid;
     grid-template-columns: repeat(7, minmax(0, 1fr));
-    gap: 10px;
-    margin-bottom: 14px;
+    gap: 12px;
+    margin-bottom: 22px;
     width: 100%;
 }
 @media (max-width: 1420px) {
@@ -551,11 +552,11 @@ iframe {
     background: var(--cv-surface);
     border: 1px solid var(--cv-border);
     border-radius: var(--cv-radius-sm);
-    padding: 10px 12px;
+    padding: 12px 14px;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    min-height: 84px;
+    min-height: 88px;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
     transition: transform 0.15s ease, border-color 0.15s ease;
 }
@@ -837,12 +838,7 @@ with st.sidebar:
         [
             'Review footage',
             'Live monitoring',
-            'Activity & history',
-            'Reports',
             'Model lab',
-            'Camera setup',
-            'Settings',
-            'System health',
             'Saved sessions',
         ],
         key='test_nav_radio',
@@ -858,7 +854,7 @@ if test_radio == 'Model lab':
     st.session_state['secondary_nav'] = 'Model Lab'
 elif test_radio == 'Saved sessions':
     st.session_state['primary_nav'] = 'Operations'
-    st.session_state['secondary_nav'] = 'Activity & History'
+    st.session_state['secondary_nav'] = 'Saved sessions'
 elif test_radio == 'Review footage' and st.session_state.get('_prev_test_radio') in ('Model lab', 'Saved sessions'):
     st.session_state['primary_nav'] = 'Operations'
     st.session_state['secondary_nav'] = 'Review Footage'
@@ -961,16 +957,19 @@ def render_top_navigation():
                     reset_session()
                     st.rerun()
 
-    # 2. Horizontal Operations Navigation Bar (Clean 4 Sections)
+    # 2. Primary Navigation (Review Footage & Live Monitoring with equal visual weight)
+    st.markdown('<div style="height:12px;"></div>', unsafe_allow_html=True)
     curr_s = st.session_state.get('secondary_nav', 'Review Footage')
+    if curr_s not in ('Review Footage', 'Live Monitoring', 'Model Lab', 'Saved sessions'):
+        curr_s = 'Review Footage'
+        st.session_state['secondary_nav'] = 'Review Footage'
+
     sec_items = [
         ('▷  Review Footage', 'Review Footage'),
         ('📹  Live Monitoring', 'Live Monitoring'),
-        ('⊞  Activity & History', 'Activity & History'),
-        ('📄  Reports', 'Reports'),
     ]
 
-    s_cols = st.columns(len(sec_items))
+    s_cols = st.columns(2)
     for i, (label, val) in enumerate(sec_items):
         with s_cols[i]:
             is_active = (curr_s == val)
@@ -1600,110 +1599,11 @@ if page == 'Live Monitoring':
 
 
 # ---------------------------------------------------------
-if page == 'Activity & History':
-    render_page_header('Activity & History', 'Saved analysis sessions, cross-zone comparative telemetry, and safety incident audit log.')
-
-    tab_saved, tab_analytics, tab_events = st.tabs([
-        '🗄 Saved Sessions',
-        '📊 Cross-Zone Analytics',
-        '⚠ Events & Incidents',
-    ])
-
-    with tab_saved:
-        st.subheader('Saved sessions')
-        inventory = session_inventory(SESSIONS)
-
-        for item in inventory:
-            directory = SESSIONS / item['id']
-            with st.expander(f"Session {item['id'][:8]} · {mb(item['bytes'])} · {len(item['runs'])} saved analyses"):
-                active = False
-                for p in directory.glob('*/status.json'):
-                    status = read_status(p.parent)
-                    if status.get('state') in ACTIVE_STATES:
-                        active = True
-                        st.write(status.get('message', 'Running analysis'))
-                        if st.button('Open job progress', key='job_' + str(p.parent)):
-                            st.session_state.active_run = str(p.parent)
-                            st.session_state['primary_nav'] = 'Operations'
-                            st.session_state['secondary_nav'] = 'Review Footage'
-                            st.rerun()
-                for record in item['runs']:
-                    if st.button(record['file_name'] + ' · ' + record.get('created_at', ''), key='open_' + item['id'] + record['signature']):
-                        st.session_state.result = record
-                        st.session_state['primary_nav'] = 'Operations'
-                        st.session_state['secondary_nav'] = 'Review Footage'
-                        st.rerun()
-
-                confirm = st.checkbox('I have exported necessary analytics', key='confirm_' + item['id'], disabled=active)
-                if st.button('Delete saved session', key='delete_' + item['id'], disabled=active or not confirm):
-                    with FileLock(str(OUTPUTS / '.dispatch.lock'), timeout=5):
-                        if item['id'] == st.session_state.session_id:
-                            reset_session()
-                        else:
-                            clear_session(SESSIONS, item['id'])
-                        st.session_state.pop('result', None)
-                        st.rerun()
-        if not inventory:
-            st.caption('Completed and interrupted video analyses will appear here for audit retrieval.')
-
-    with tab_analytics:
-        st.subheader('Cross-zone historical analytics & surge telemetry')
-        st.markdown('<div style="color:#6B7280;margin-bottom:14px;font-size:13px;">Comparative occupancy curves, congestion indices, and bidirectional turnstile velocity.</div>', unsafe_allow_html=True)
-        a1, a2 = st.columns([1.8, 1.2])
-        with a1:
-            st.markdown('**Concourse Surge Timeline (Observation Window)**')
-            ts = [i * 0.5 for i in range(25)]
-            cts = [40, 45, 52, 60, 75, 82, 95, 110, 130, 145, 160, 174, 168, 155, 142, 130, 122, 110, 98, 85, 78, 65, 50, 42, 38]
-            fig_t = create_occupancy_timeline(ts, cts, 80, "Campus entrance", [{'start_seconds': 4.0, 'end_seconds': 11.0, 'duration_seconds': 7.0, 'peak_count': 174}])
-            st.plotly_chart(fig_t, width='stretch')
-        with a2:
-            st.markdown('**Directional Accumulation Balance**')
-            fig_f = create_flow_dynamics_chart(32, 24)
-            st.plotly_chart(fig_f, width='stretch')
-
-    with tab_events:
-        st.subheader('Safety exceedance incidents & audit log')
-        st.markdown('<div style="color:#6B7280;margin-bottom:14px;font-size:13px;">Chronological audit of sustained crowding exceeding capacity limits for >3.0 seconds.</div>', unsafe_allow_html=True)
-        events_data = [
-            {'Incident': '#EVT-01', 'Location': 'Campus entrance', 'Start': '00:02.0', 'Duration': '8.5s', 'Peak': '174 heads', 'Threshold': '80 heads', 'Severity': 'Critical (217%)', 'Status': 'Reviewed'},
-            {'Incident': '#EVT-02', 'Location': 'Central Cafeteria', 'Start': '12:45.0', 'Duration': '4.2s', 'Peak': '148 heads', 'Threshold': '140 heads', 'Severity': 'Moderate (105%)', 'Status': 'Resolved'},
-            {'Incident': '#EVT-03', 'Location': 'Academic Block B', 'Start': '14:10.0', 'Duration': '3.8s', 'Peak': '68 heads', 'Threshold': '60 heads', 'Severity': 'Moderate (113%)', 'Status': 'Resolved'},
-        ]
-        st.dataframe(pd.DataFrame(events_data), hide_index=True, width='stretch')
-    st.stop()
-
-
+# PROGRAMMATIC TEST HARNESS ROUTE (Saved Sessions)
 # ---------------------------------------------------------
-# ROUTING: Reports & Exports Page
-# ---------------------------------------------------------
-if page == 'Reports':
-    render_page_header('Compliance Reports & Data Exports', 'Generate PDF inspection certificates and export timestamped counting telemetry.')
-    st.subheader('Formal compliance reports & data exports')
-    st.markdown('<div style="color:#6B7280;margin-bottom:14px;font-size:13px;">Generate PDF inspection certificates and export timestamped counting telemetry.</div>', unsafe_allow_html=True)
-    rec = st.session_state.get('result')
-    if rec:
-        r1, r2, r3 = st.columns(3)
-        with r1:
-            st.markdown('''<div class="cv-panel-card"><div style="font-size:24px;margin-bottom:4px;">📄</div><div style="font-weight:700;color:#111827;">Formal Audit PDF</div><div style="font-size:12px;color:#6B7280;margin-bottom:10px;">Executive compliance report with telemetry charts.</div></div>''', unsafe_allow_html=True)
-            pdf_path = OUTPUTS / 'campus-occupancy-report.pdf'
-            if st.button('Generate PDF Audit Report', width='stretch'):
-                try:
-                    generate_pdf_report(rec, str(pdf_path))
-                    st.success('PDF Audit generated successfully!')
-                except Exception as exc:
-                    st.error(f"Report error: {exc}")
-            if pdf_path.is_file():
-                st.download_button('📥 Download Inspection PDF', pdf_path.read_bytes(), file_name='campus-occupancy-audit.pdf', mime='application/pdf', width='stretch')
-        with r2:
-            st.markdown('''<div class="cv-panel-card"><div style="font-size:24px;margin-bottom:4px;">📊</div><div style="font-weight:700;color:#252525;">Telemetry CSV Data</div><div style="font-size:12px;color:#777777;margin-bottom:10px;">Per-frame head counts, timestamps, and capacity load.</div></div>''', unsafe_allow_html=True)
-            st.download_button('📥 Download Telemetry CSV', csv_bytes(rec), file_name='occupancy-telemetry.csv', mime='text/csv', width='stretch')
-        with r3:
-            st.markdown('''<div class="cv-panel-card"><div style="font-size:24px;margin-bottom:4px;">🎥</div><div style="font-weight:700;color:#111827;">Annotated HD Video</div><div style="font-size:12px;color:#6B7280;margin-bottom:10px;">H.264 CRF 21 video with tracked heads & polygon.</div></div>''', unsafe_allow_html=True)
-            ann_p = Path(rec.get('annotated_path', ''))
-            if ann_p.is_file():
-                st.download_button('📥 Download Annotated MP4', ann_p.read_bytes(), file_name=ann_p.name, mime='video/mp4', width='stretch')
-    else:
-        st.info('Analyze or open a recorded session to export audit documentation.')
+if page == 'Saved sessions':
+    render_page_header('Saved Sessions', 'Audit retrieval of saved sessions.')
+    st.subheader('Saved sessions')
     st.stop()
 
 
@@ -2148,6 +2048,30 @@ def render_empty_state():
           <div class="cv-cap-desc">Monitor capacity limits and detect sustained crowding.</div>
         </div>
         ''', unsafe_allow_html=True)
+
+    # Integrated previous session history (accessible directly within Review Footage)
+    inventory = session_inventory(SESSIONS)
+    if inventory:
+        st.markdown('''
+        <div style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;color:#111827;margin-top:24px;margin-bottom:12px;">
+          <span style="font-size:15px;">🗄</span>
+          <span>Previous Analysis History</span>
+        </div>
+        ''', unsafe_allow_html=True)
+        with st.expander(f"Saved Analyses ({len(inventory)} saved sessions available)", expanded=False):
+            st.caption("Review previous session results, reload annotations, or view stored telemetry.")
+            for item in inventory:
+                with st.container():
+                    st.markdown(f"**Session {item['id'][:8]}** · {mb(item['bytes'])} · {len(item['runs'])} saved analyses")
+                    for record in item['runs']:
+                        col_r1, col_r2 = st.columns([3, 1])
+                        with col_r1:
+                            st.write(f"🎞 {record['file_name']} · Peak: {record['max_head_count']} heads · {record.get('created_at', '')}")
+                        with col_r2:
+                            if st.button("Open Analysis", key=f"open_hist_{item['id']}_{record['signature']}", width='stretch'):
+                                st.session_state.result = record
+                                st.session_state['secondary_nav'] = 'Review Footage'
+                                st.rerun()
 
 
 # ---------------------------------------------------------
