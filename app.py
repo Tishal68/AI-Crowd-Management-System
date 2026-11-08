@@ -679,27 +679,16 @@ iframe {
     border-color: var(--cv-primary) !important;
 }
 
-/* Hide file size limit from uploader dropzone instructions */
-[data-testid="stFileUploaderDropzoneInstructions"] > div,
-[data-testid="stFileUploaderDropzoneInstructions"] span,
-[data-testid="stFileUploaderDropzoneInstructions"] div {
-    font-size: 0 !important;
-    line-height: 0 !important;
-    visibility: hidden !important;
-    height: 0 !important;
-    max-height: 0 !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    display: none !important;
-}
-[data-testid="stFileUploaderDropzoneInstructions"]::after {
-    content: "JPG, PNG, BMP, MP4, AVI, MOV, MKV" !important;
+/* Upload Dropzone Styling: Preserves native instructions, supported formats & accessibility */
+[data-testid="stFileUploaderDropzoneInstructions"] {
+    color: var(--cv-text-secondary) !important;
     font-size: 13px !important;
     line-height: 1.4 !important;
+}
+[data-testid="stFileUploaderDropzoneInstructions"] * {
     color: var(--cv-text-secondary) !important;
-    font-weight: 400 !important;
-    visibility: visible !important;
-    display: block !important;
+    font-size: 13px !important;
+    line-height: 1.4 !important;
 }
 
 /* Custom Tabs Matching Segmented Control */
