@@ -143,9 +143,7 @@ div[data-testid="stSidebarCollapsedControl"],
     display: flex;
     align-items: center;
     gap: 12px;
-    height: 40px;
-    padding: 0;
-    margin: 0;
+    padding: 4px 0;
 }
 .cv-top-brand-icon {
     width: 38px;
@@ -165,13 +163,14 @@ div[data-testid="stSidebarCollapsedControl"],
     font-weight: 700;
     color: #111827;
     letter-spacing: -0.25px;
-    line-height: 1.15;
+    line-height: 1.2;
 }
 .cv-top-brand-subtitle {
-    font-size: 11.5px;
+    font-size: 12px;
     color: var(--cv-text-secondary);
     font-weight: 500;
-    margin-top: 1px;
+    margin-top: 2px;
+    line-height: 1.2;
 }
 
 /* TOP STATUS BADGE */
@@ -199,8 +198,8 @@ div[data-testid="stSidebarCollapsedControl"],
 
 /* UNIFIED BUTTON SYSTEM (Standard Height: 40px, Compact: 34px, Large: 44px) */
 .stButton > button {
-    min-height: 40px !important;
-    height: 40px !important;
+    min-height: 42px !important;
+    height: 42px !important;
     border-radius: var(--cv-radius-sm) !important;
     font-family: inherit !important;
     font-size: 13.5px !important;
@@ -378,44 +377,14 @@ button[type="secondary"]:hover *,
     color: #111827 !important;
 }
 
-/* PRIMARY NAVIGATION BUTTONS DEDICATED STYLING */
+/* PRIMARY NAVIGATION SPACING & DIVIDER */
 .cv-nav-spacer {
-    height: 14px;
-}
-.cv-nav-marker {
-    display: none !important;
-}
-[data-testid="stVerticalBlock"]:has(.cv-nav-marker) {
-    gap: 0 !important;
-}
-[data-testid="stVerticalBlock"]:has(.cv-nav-marker) [data-testid="stHorizontalBlock"] {
-    gap: 16px !important;
-    align-items: stretch !important;
-}
-[data-testid="stVerticalBlock"]:has(.cv-nav-marker) [data-testid="column"] {
-    width: 50% !important;
-    flex: 1 1 50% !important;
-}
-[data-testid="stVerticalBlock"]:has(.cv-nav-marker) button {
-    min-height: 44px !important;
-    height: 44px !important;
-    font-size: 14px !important;
-    font-weight: 600 !important;
-    letter-spacing: 0.2px !important;
-    border-radius: var(--cv-radius-md) !important;
-    padding: 0 24px !important;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
-    transition: all 0.16s ease !important;
-    width: 100% !important;
-}
-[data-testid="stVerticalBlock"]:has(.cv-nav-marker) button:hover {
-    transform: translateY(-1px) !important;
-    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.08) !important;
+    height: 8px;
 }
 
 .cv-nav-divider {
     border-bottom: 1px solid var(--cv-border);
-    margin-top: 16px;
+    margin-top: 14px;
     margin-bottom: 22px;
 }
 
@@ -608,14 +577,6 @@ iframe {
     .stMainBlockContainer {
         padding-left: 0.75rem !important;
         padding-right: 0.75rem !important;
-    }
-    [data-testid="stVerticalBlock"]:has(.cv-nav-marker) [data-testid="stHorizontalBlock"] {
-        flex-direction: column !important;
-        gap: 10px !important;
-    }
-    [data-testid="stVerticalBlock"]:has(.cv-nav-marker) [data-testid="column"] {
-        width: 100% !important;
-        flex: 1 1 100% !important;
     }
     .kpi-container {
         grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
@@ -1043,18 +1004,16 @@ def render_top_navigation():
         ('📹  Live Monitoring', 'Live Monitoring'),
     ]
 
-    with st.container():
-        st.markdown('<span class="cv-nav-marker"></span>', unsafe_allow_html=True)
-        s_cols = st.columns(2, gap="medium")
-        for i, (label, val) in enumerate(sec_items):
-            with s_cols[i]:
-                is_active = (curr_s == val)
-                if st.button(label, key=f'btn_sec_{val}', type='primary' if is_active else 'secondary', width='stretch'):
-                    if curr_s != val:
-                        release_global_stream()
-                        st.session_state['rtsp_active'] = False
-                    st.session_state['secondary_nav'] = val
-                    st.rerun()
+    s_cols = st.columns(2, gap="medium")
+    for i, (label, val) in enumerate(sec_items):
+        with s_cols[i]:
+            is_active = (curr_s == val)
+            if st.button(label, key=f'btn_sec_{val}', type='primary' if is_active else 'secondary', width='stretch'):
+                if curr_s != val:
+                    release_global_stream()
+                    st.session_state['rtsp_active'] = False
+                st.session_state['secondary_nav'] = val
+                st.rerun()
 
     st.markdown('<div class="cv-nav-divider"></div>', unsafe_allow_html=True)
 
