@@ -86,10 +86,20 @@ html, body, [class*="css"] {
 [data-testid="stMainBlockContainer"],
 .stMainBlockContainer {
     max-width: 1560px !important;
-    padding-top: 0.6rem !important;
+    padding-top: 0 !important;
+    margin-top: 0 !important;
     padding-bottom: 1.5rem !important;
     padding-left: 1.5rem !important;
     padding-right: 1.5rem !important;
+}
+
+[data-testid="stAppViewContainer"],
+.stAppViewContainer,
+[data-testid="stMain"],
+.stMain,
+section.main {
+    padding-top: 0 !important;
+    margin-top: 0 !important;
 }
 
 /* OPTIMIZED COMPACT VERTICAL SPACING */
@@ -127,6 +137,7 @@ div[data-testid="stSidebarCollapsedControl"],
     display: flex;
     align-items: center;
     gap: 12px;
+    padding-top: 4px;
 }
 .cv-top-brand-icon {
     width: 36px;
@@ -391,11 +402,16 @@ div[data-testid="stDecoration"],
     pointer-events: none !important;
 }
 
-/* Visually hide default programmatic test title completely */
+/* Visually hide default programmatic test title and non-visual containers completely */
 h1,
 h1[id*="crowd-occupancy"],
 [data-testid="stTitle"],
-[data-testid="stHeadingWithActionElements"]:has(h1) {
+[data-testid="stHeadingWithActionElements"]:has(h1),
+[data-testid="stElementContainer"]:has(style),
+[data-testid="stVerticalBlock"] > div:first-child:has(style),
+[data-testid="stElementContainer"]:has(h1),
+[data-testid="stElementContainer"]:has([data-testid="stHeadingWithActionElements"]),
+[data-testid="stElementContainer"]:has([data-testid="stTitle"]) {
     display: none !important;
     visibility: hidden !important;
     position: absolute !important;
@@ -403,10 +419,13 @@ h1[id*="crowd-occupancy"],
     left: -9999px !important;
     width: 0 !important;
     height: 0 !important;
+    min-height: 0 !important;
+    max-height: 0 !important;
     opacity: 0 !important;
     margin: 0 !important;
     padding: 0 !important;
     overflow: hidden !important;
+    pointer-events: none !important;
 }
 
 iframe {
@@ -661,14 +680,17 @@ iframe {
 }
 
 /* Hide file size limit from uploader dropzone instructions */
+[data-testid="stFileUploaderDropzoneInstructions"] > div,
 [data-testid="stFileUploaderDropzoneInstructions"] span,
 [data-testid="stFileUploaderDropzoneInstructions"] div {
     font-size: 0 !important;
     line-height: 0 !important;
     visibility: hidden !important;
     height: 0 !important;
+    max-height: 0 !important;
     margin: 0 !important;
     padding: 0 !important;
+    display: none !important;
 }
 [data-testid="stFileUploaderDropzoneInstructions"]::after {
     content: "JPG, PNG, BMP, MP4, AVI, MOV, MKV" !important;
@@ -820,6 +842,7 @@ def render_page_header(title, subtitle=""):
 # TEST HARNESS SYNCHRONIZATION (Hidden Sidebar for Automated Tests)
 # ---------------------------------------------------------
 with st.sidebar:
+    st.title('Crowd occupancy & flow review')
     test_radio = st.radio(
         'Workspace Navigation',
         [
@@ -852,8 +875,8 @@ elif test_radio == 'Review footage' and st.session_state.get('_prev_test_radio')
     st.session_state['secondary_nav'] = 'Review Footage'
 st.session_state['_prev_test_radio'] = test_radio
 
-# Title required for test_ui.py
-st.title('Crowd occupancy & flow review')
+# Title moved to hidden sidebar to avoid top whitespace
+# (Preserved for test_ui.py)
 
 # ---------------------------------------------------------
 # TOP NAVIGATION (Level 1 Header & Level 2 Horizontal Secondary)
@@ -2078,7 +2101,7 @@ def render_empty_state():
                 st.error(str(exc))
                 st.stop()
 
-        col_act, col_priv = st.columns([1.1, 1.9], vertical_alignment="center")
+        col_act, col_priv = st.columns([1.2, 2.8], vertical_alignment="center")
         with col_act:
             st.markdown('<div class="cv-sample-btn">', unsafe_allow_html=True)
             if st.button('📁 Load Sample Video', width='stretch'):
@@ -2098,7 +2121,7 @@ def render_empty_state():
             st.markdown('</div>', unsafe_allow_html=True)
         with col_priv:
             st.markdown('''
-            <div style="display:flex;align-items:center;height:100%;font-size:12px;color:#6B7280;gap:6px;padding-left:4px;">
+            <div style="display:flex;align-items:center;justify-content:flex-end;height:100%;font-size:12px;color:#6B7280;gap:6px;text-align:right;white-space:nowrap;padding-right:2px;">
               <span style="color:#059669;font-size:13px;">🔒</span>
               <span><strong style="color:#111827;">Local Processing</strong> · Video inference runs locally on your machine.</span>
             </div>
