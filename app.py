@@ -45,9 +45,9 @@ st.markdown('''
     --cv-bg: #F8F9FA;
     --cv-surface: #FFFFFF;
     --cv-surface-alt: #F1F3F5;
-    --cv-primary: #C25E2E;
-    --cv-primary-hover: #B15224;
-    --cv-primary-dark: #9C461C;
+    --cv-primary: #BF5522;
+    --cv-primary-hover: #AD4B1C;
+    --cv-primary-dark: #963F15;
     --cv-text: #1F2937;
     --cv-text-secondary: #6B7280;
     --cv-text-muted: #9CA3AF;
@@ -72,6 +72,8 @@ st.markdown('''
 
 html, body, [class*="css"] {
     font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
 /* Backgrounds & Global Palette */
@@ -100,7 +102,7 @@ html, body, [class*="css"] {
     padding: 0 !important;
 }
 
-[data-testid="stMarkdownContainer"] p {
+[data-testid="stMarkdownContainer"]:not(button *):not([data-testid^="stBaseButton"] *) p {
     margin-bottom: 0 !important;
     color: var(--cv-text-secondary);
 }
@@ -136,7 +138,7 @@ div[data-testid="stSidebarCollapsedControl"],
     justify-content: center;
     color: #ffffff;
     font-size: 17px;
-    box-shadow: 0 1px 3px rgba(194, 94, 46, 0.2);
+    box-shadow: 0 1px 3px rgba(191, 85, 34, 0.25);
 }
 .cv-top-brand-title {
     font-size: 17.5px;
@@ -166,6 +168,7 @@ div[data-testid="stSidebarCollapsedControl"],
     color: var(--cv-success);
     height: 40px;
     box-sizing: border-box;
+    white-space: nowrap;
 }
 .cv-status-dot {
     width: 7px;
@@ -180,7 +183,7 @@ div[data-testid="stSidebarCollapsedControl"],
     height: 40px !important;
     border-radius: var(--cv-radius-sm) !important;
     font-family: inherit !important;
-    font-size: 13px !important;
+    font-size: 13.5px !important;
     font-weight: 500 !important;
     padding: 0 16px !important;
     display: inline-flex !important;
@@ -190,23 +193,65 @@ div[data-testid="stSidebarCollapsedControl"],
     box-sizing: border-box !important;
 }
 
-/* Primary buttons: subtle, mature terracotta accent */
-.stButton > button[kind="primary"],
-.stButton > button[type="primary"] {
-    background: var(--cv-primary) !important;
-    border: 1px solid var(--cv-primary-hover) !important;
-    color: #ffffff !important;
-    font-weight: 600 !important;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
-}
-.stButton > button[kind="primary"]:hover,
-.stButton > button[type="primary"]:hover {
-    background: var(--cv-primary-hover) !important;
-    border-color: var(--cv-primary-dark) !important;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08) !important;
+/* Ensure paragraph inside button never inherits gray markdown color */
+.stButton button [data-testid="stMarkdownContainer"] p,
+.stButton button p,
+.stButton button span,
+.stButton button div,
+[data-testid="stFileUploader"] button p,
+[data-testid="stFileUploader"] button span,
+[data-testid="stFileUploader"] button div {
+    color: inherit !important;
+    font-weight: inherit !important;
+    font-size: inherit !important;
+    line-height: inherit !important;
+    margin: 0 !important;
+    padding: 0 !important;
 }
 
-/* Secondary buttons: crisp white card with delicate neutral border */
+/* PRIMARY & ACTIVE BUTTONS: Razor-sharp, high-contrast, crystal-clear white text */
+button[data-testid="stBaseButton-primary"],
+button[kind="primary"],
+button[type="primary"],
+.stButton > button[kind="primary"],
+.stButton > button[type="primary"],
+[data-testid="stFileUploader"] button {
+    background: #BF5522 !important;
+    border: 1px solid #A8481B !important;
+    color: #FFFFFF !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08) !important;
+}
+
+button[data-testid="stBaseButton-primary"] *,
+button[kind="primary"] *,
+button[type="primary"] *,
+.stButton > button[kind="primary"] *,
+.stButton > button[type="primary"] *,
+[data-testid="stFileUploader"] button * {
+    color: #FFFFFF !important;
+    font-weight: 600 !important;
+    font-size: 13.5px !important;
+    opacity: 1 !important;
+    text-shadow: 0 1px 1px rgba(0, 0, 0, 0.25) !important;
+    -webkit-font-smoothing: antialiased !important;
+    -moz-osx-font-smoothing: grayscale !important;
+}
+
+button[data-testid="stBaseButton-primary"]:hover,
+button[kind="primary"]:hover,
+button[type="primary"]:hover,
+.stButton > button[kind="primary"]:hover,
+.stButton > button[type="primary"]:hover,
+[data-testid="stFileUploader"] button:hover {
+    background: #AD4B1C !important;
+    border-color: #963F15 !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* SECONDARY BUTTONS: Crisp white card with delicate neutral border */
+button[data-testid="stBaseButton-secondary"],
+button[kind="secondary"],
+button[type="secondary"],
 .stButton > button[kind="secondary"],
 .stButton > button[type="secondary"],
 .stButton > button:not([kind="primary"]):not([type="primary"]) {
@@ -216,22 +261,56 @@ div[data-testid="stSidebarCollapsedControl"],
     font-weight: 500 !important;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03) !important;
 }
+
+button[data-testid="stBaseButton-secondary"] *,
+button[kind="secondary"] *,
+button[type="secondary"] *,
+.stButton > button[kind="secondary"] *,
+.stButton > button[type="secondary"] *,
+.stButton > button:not([kind="primary"]):not([type="primary"]) * {
+    color: #374151 !important;
+    font-weight: 500 !important;
+    font-size: 13px !important;
+    opacity: 1 !important;
+    text-shadow: none !important;
+}
+
+button[data-testid="stBaseButton-secondary"]:hover,
+button[kind="secondary"]:hover,
+button[type="secondary"]:hover,
 .stButton > button[kind="secondary"]:hover,
 .stButton > button[type="secondary"]:hover,
 .stButton > button:not([kind="primary"]):not([type="primary"]):hover {
     background: #F9FAFB !important;
     border-color: #D1D5DB !important;
+}
+
+button[data-testid="stBaseButton-secondary"]:hover *,
+button[kind="secondary"]:hover *,
+button[type="secondary"]:hover *,
+.stButton > button[kind="secondary"]:hover *,
+.stButton > button[type="secondary"]:hover *,
+.stButton > button:not([kind="primary"]):not([type="primary"]):hover * {
     color: #111827 !important;
 }
 
-/* Popover button: exactly 40px height aligned with header items */
+/* POPOVER BUTTON: Positioned flush right and standard 40px height */
 [data-testid="stPopover"] {
     display: flex !important;
+    justify-content: flex-end !important;
     align-items: center !important;
+    width: 100% !important;
+}
+[data-testid="stPopoverButton"] {
+    display: flex !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
+    width: 100% !important;
 }
 [data-testid="stPopoverButton"] > button {
     min-height: 40px !important;
     height: 40px !important;
+    width: 100% !important;
     border-radius: var(--cv-radius-sm) !important;
     background: var(--cv-surface) !important;
     border: 1px solid var(--cv-border) !important;
@@ -568,7 +647,7 @@ iframe {
     color: #D1D5DB;
 }
 
-/* Upload Dropzone Styling */
+/* Upload Dropzone Styling & File Limit Removal */
 [data-testid="stFileUploader"] {
     background: var(--cv-surface) !important;
     border: 1.5px dashed #D1D5DB !important;
@@ -580,19 +659,25 @@ iframe {
 [data-testid="stFileUploader"]:hover {
     border-color: var(--cv-primary) !important;
 }
-[data-testid="stFileUploader"] button {
-    background: var(--cv-primary) !important;
-    border: 1px solid var(--cv-primary-hover) !important;
-    color: #ffffff !important;
-    font-weight: 500 !important;
-    border-radius: 6px !important;
-    padding: 5px 16px !important;
-    font-size: 13px !important;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+
+/* Hide file size limit from uploader dropzone instructions */
+[data-testid="stFileUploaderDropzoneInstructions"] span,
+[data-testid="stFileUploaderDropzoneInstructions"] div {
+    font-size: 0 !important;
+    line-height: 0 !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
 }
-[data-testid="stFileUploader"] button:hover {
-    background: var(--cv-primary-hover) !important;
-    border-color: var(--cv-primary-dark) !important;
+[data-testid="stFileUploaderDropzoneInstructions"]::after {
+    content: "JPG, PNG, BMP, MP4, AVI, MOV, MKV" !important;
+    font-size: 13px !important;
+    line-height: 1.4 !important;
+    color: var(--cv-text-secondary) !important;
+    font-weight: 400 !important;
+    visibility: visible !important;
+    display: block !important;
 }
 
 /* Custom Tabs Matching Segmented Control */
@@ -774,8 +859,8 @@ st.title('Crowd occupancy & flow review')
 # TOP NAVIGATION (Level 1 Header & Level 2 Horizontal Secondary)
 # ---------------------------------------------------------
 def render_top_navigation():
-    # 1. Primary Top Header Bar
-    c_brand, c_controls = st.columns([2.2, 1.8], vertical_alignment="center")
+    # 1. Primary Top Header Bar (Controls pushed flush right)
+    c_brand, c_controls = st.columns([2.75, 1.25], vertical_alignment="center")
 
     with c_brand:
         st.markdown('''
@@ -789,7 +874,7 @@ def render_top_navigation():
         ''', unsafe_allow_html=True)
 
     with c_controls:
-        c_status, c_popover = st.columns([1.4, 1.0], vertical_alignment="center")
+        c_status, c_popover = st.columns([1.05, 0.95], vertical_alignment="center")
         with c_status:
             import torch
             has_cuda = torch.cuda.is_available()
