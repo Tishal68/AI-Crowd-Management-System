@@ -1,8 +1,4 @@
 import os
-"""
-CrowdVision AI — Campus Crowd Intelligence & Monitoring Platform.
-Enterprise-grade Streamlit application designed for dark-navy operations monitoring.
-"""
 from pathlib import Path
 import hashlib
 import json
@@ -46,23 +42,32 @@ st.markdown('''
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 :root {
-    --cv-bg: #F7F5F0;
+    --cv-bg: #F8F9FA;
     --cv-surface: #FFFFFF;
-    --cv-surface-alt: #F0EEE9;
-    --cv-primary: #E87532;
-    --cv-primary-hover: #D96527;
-    --cv-primary-dark: #C65D27;
-    --cv-text: #252525;
-    --cv-text-secondary: #777777;
-    --cv-text-muted: #999999;
-    --cv-border: #E7E3DC;
-    --cv-success: #23865B;
-    --cv-warning: #D99528;
-    --cv-danger: #D94A4A;
-    --cv-info: #3D78A8;
-    --cv-radius-sm: 7px;
-    --cv-radius-md: 11px;
-    --cv-radius-lg: 14px;
+    --cv-surface-alt: #F1F3F5;
+    --cv-primary: #C25E2E;
+    --cv-primary-hover: #B15224;
+    --cv-primary-dark: #9C461C;
+    --cv-text: #1F2937;
+    --cv-text-secondary: #6B7280;
+    --cv-text-muted: #9CA3AF;
+    --cv-border: #E5E7EB;
+    --cv-border-subtle: #F3F4F6;
+    --cv-success: #059669;
+    --cv-success-bg: #ECFDF5;
+    --cv-success-border: #A7F3D0;
+    --cv-warning: #D97706;
+    --cv-warning-bg: #FFFBEB;
+    --cv-warning-border: #FDE68A;
+    --cv-danger: #DC2626;
+    --cv-danger-bg: #FEF2F2;
+    --cv-danger-border: #FECACA;
+    --cv-info: #2563EB;
+    --cv-info-bg: #EFF6FF;
+    --cv-info-border: #BFDBFE;
+    --cv-radius-sm: 6px;
+    --cv-radius-md: 10px;
+    --cv-radius-lg: 12px;
 }
 
 html, body, [class*="css"] {
@@ -122,62 +127,60 @@ div[data-testid="stSidebarCollapsedControl"],
     gap: 12px;
 }
 .cv-top-brand-icon {
-    width: 38px;
-    height: 38px;
-    border-radius: var(--cv-radius-sm);
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
     background: linear-gradient(135deg, var(--cv-primary) 0%, var(--cv-warning) 100%);
     display: flex;
     align-items: center;
     justify-content: center;
     color: #ffffff;
-    font-size: 18px;
-    box-shadow: 0 3px 10px rgba(232, 117, 50, 0.35);
+    font-size: 17px;
+    box-shadow: 0 1px 3px rgba(194, 94, 46, 0.2);
 }
 .cv-top-brand-title {
-    font-size: 18px;
+    font-size: 17.5px;
     font-weight: 700;
-    color: var(--cv-text);
-    letter-spacing: -0.3px;
+    color: #111827;
+    letter-spacing: -0.2px;
     line-height: 1.1;
 }
 .cv-top-brand-subtitle {
     font-size: 11.5px;
     color: var(--cv-text-secondary);
     font-weight: 500;
-    margin-top: 2px;
+    margin-top: 1px;
 }
 
 /* TOP STATUS BADGE */
 .cv-top-status-badge {
-    background: var(--cv-surface);
-    border: 1px solid var(--cv-border);
+    background: var(--cv-success-bg);
+    border: 1px solid var(--cv-success-border);
     border-radius: 20px;
-    padding: 0 14px;
+    padding: 0 12px;
     display: inline-flex;
     align-items: center;
-    gap: 8px;
+    gap: 7px;
     font-size: 12px;
     font-weight: 600;
     color: var(--cv-success);
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
-    height: 42px;
+    height: 40px;
     box-sizing: border-box;
 }
 .cv-status-dot {
-    width: 8px;
-    height: 8px;
+    width: 7px;
+    height: 7px;
     border-radius: 50%;
     background: var(--cv-success);
-    box-shadow: 0 0 6px rgba(35, 134, 91, 0.6);
 }
 
-/* UNIFIED BUTTON SYSTEM (Standard Height: 42px, Compact: 36px, Large: 46px) */
+/* UNIFIED BUTTON SYSTEM (Standard Height: 40px, Compact: 34px, Large: 44px) */
 .stButton > button {
-    min-height: 42px !important;
-    height: 42px !important;
+    min-height: 40px !important;
+    height: 40px !important;
     border-radius: var(--cv-radius-sm) !important;
     font-family: inherit !important;
-    font-size: 13.5px !important;
+    font-size: 13px !important;
     font-weight: 500 !important;
     padding: 0 16px !important;
     display: inline-flex !important;
@@ -187,92 +190,93 @@ div[data-testid="stSidebarCollapsedControl"],
     box-sizing: border-box !important;
 }
 
-/* Primary buttons: warm burnt orange accent */
+/* Primary buttons: subtle, mature terracotta accent */
 .stButton > button[kind="primary"],
 .stButton > button[type="primary"] {
     background: var(--cv-primary) !important;
     border: 1px solid var(--cv-primary-hover) !important;
     color: #ffffff !important;
     font-weight: 600 !important;
-    box-shadow: 0 2px 8px rgba(232, 117, 50, 0.35) !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
 }
 .stButton > button[kind="primary"]:hover,
 .stButton > button[type="primary"]:hover {
     background: var(--cv-primary-hover) !important;
     border-color: var(--cv-primary-dark) !important;
-    box-shadow: 0 4px 12px rgba(232, 117, 50, 0.45) !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08) !important;
 }
 
-/* Secondary buttons: pure white card with subtle warm border */
+/* Secondary buttons: crisp white card with delicate neutral border */
 .stButton > button[kind="secondary"],
 .stButton > button[type="secondary"],
 .stButton > button:not([kind="primary"]):not([type="primary"]) {
     background: var(--cv-surface) !important;
     border: 1px solid var(--cv-border) !important;
-    color: var(--cv-text) !important;
+    color: #374151 !important;
     font-weight: 500 !important;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03) !important;
 }
 .stButton > button[kind="secondary"]:hover,
 .stButton > button[type="secondary"]:hover,
 .stButton > button:not([kind="primary"]):not([type="primary"]):hover {
-    background: var(--cv-surface-alt) !important;
-    border-color: var(--cv-primary) !important;
-    color: var(--cv-text) !important;
+    background: #F9FAFB !important;
+    border-color: #D1D5DB !important;
+    color: #111827 !important;
 }
 
-/* Popover button: exactly 42px height aligned with header items */
+/* Popover button: exactly 40px height aligned with header items */
 [data-testid="stPopover"] {
     display: flex !important;
     align-items: center !important;
 }
 [data-testid="stPopoverButton"] > button {
-    min-height: 42px !important;
-    height: 42px !important;
+    min-height: 40px !important;
+    height: 40px !important;
     border-radius: var(--cv-radius-sm) !important;
     background: var(--cv-surface) !important;
     border: 1px solid var(--cv-border) !important;
-    color: var(--cv-text) !important;
+    color: #374151 !important;
     font-weight: 500 !important;
-    font-size: 13.5px !important;
+    font-size: 13px !important;
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03) !important;
     transition: all 0.15s ease !important;
 }
 [data-testid="stPopoverButton"] > button:hover {
-    background: var(--cv-surface-alt) !important;
-    border-color: var(--cv-primary) !important;
-    color: var(--cv-text) !important;
+    background: #F9FAFB !important;
+    border-color: #D1D5DB !important;
+    color: #111827 !important;
 }
 [data-testid="stPopoverBody"] {
     background: var(--cv-surface) !important;
     border: 1px solid var(--cv-border) !important;
     border-radius: var(--cv-radius-md) !important;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1) !important;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04) !important;
     color: var(--cv-text) !important;
 }
 
-/* Download buttons: exactly 42px height matching button system */
+/* Download buttons: exactly 40px height matching button system */
 .stDownloadButton > button {
-    min-height: 42px !important;
-    height: 42px !important;
+    min-height: 40px !important;
+    height: 40px !important;
     border-radius: var(--cv-radius-sm) !important;
     background: var(--cv-surface) !important;
     border: 1px solid var(--cv-border) !important;
-    color: var(--cv-text) !important;
+    color: #374151 !important;
     font-weight: 500 !important;
+    font-size: 13px !important;
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03) !important;
     transition: all 0.15s ease !important;
 }
 .stDownloadButton > button:hover {
-    background: var(--cv-surface-alt) !important;
-    border-color: var(--cv-primary) !important;
-    color: var(--cv-text) !important;
+    background: #F9FAFB !important;
+    border-color: #D1D5DB !important;
+    color: #111827 !important;
 }
 
 .cv-nav-divider {
@@ -340,9 +344,9 @@ iframe {
     margin-bottom: 14px;
 }
 .cv-page-title {
-    font-size: 20px;
+    font-size: 19px;
     font-weight: 700;
-    color: var(--cv-text);
+    color: #111827;
     letter-spacing: -0.3px;
     line-height: 1.2;
     display: flex;
@@ -361,7 +365,7 @@ iframe {
     border-radius: var(--cv-radius-lg) !important;
     padding: 18px 22px 16px !important;
     margin-bottom: 12px !important;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04) !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03) !important;
 }
 
 [data-testid="stVerticalBlockBorderWrapper"] > div {
@@ -373,21 +377,21 @@ iframe {
 
 /* Sample video button styling */
 .cv-sample-btn button {
-    min-height: 42px !important;
-    height: 42px !important;
+    min-height: 40px !important;
+    height: 40px !important;
     background: var(--cv-surface) !important;
     border: 1px solid var(--cv-border) !important;
     border-radius: var(--cv-radius-sm) !important;
-    color: var(--cv-text) !important;
+    color: #374151 !important;
     font-size: 13px !important;
     font-weight: 500 !important;
     padding: 0 16px !important;
     transition: all 0.15s ease !important;
 }
 .cv-sample-btn button:hover {
-    background: var(--cv-surface-alt) !important;
-    border-color: var(--cv-primary) !important;
-    color: var(--cv-text) !important;
+    background: #F9FAFB !important;
+    border-color: #D1D5DB !important;
+    color: #111827 !important;
 }
 
 /* Capability Cards */
@@ -400,24 +404,24 @@ iframe {
     flex-direction: column;
     justify-content: flex-start;
     height: 100%;
-    min-height: 100px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-    transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+    min-height: 96px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+    transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
 }
 .cv-capability-card:hover {
-    border-color: var(--cv-primary);
-    transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+    border-color: #D1D5DB;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
 }
 .cv-cap-icon {
-    font-size: 22px;
+    font-size: 20px;
     line-height: 1;
     margin-bottom: 8px;
 }
 .cv-cap-title {
-    font-size: 14px;
-    font-weight: 700;
-    color: var(--cv-text);
+    font-size: 13.5px;
+    font-weight: 600;
+    color: #111827;
     margin-bottom: 4px;
 }
 .cv-cap-desc {
@@ -453,17 +457,17 @@ iframe {
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    min-height: 86px;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+    min-height: 84px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
     transition: transform 0.15s ease, border-color 0.15s ease;
 }
 .kpi-card:hover {
-    border-color: var(--cv-primary);
+    border-color: #D1D5DB;
     transform: translateY(-1px);
 }
 .kpi-card-critical {
-    border-color: rgba(217, 74, 74, 0.6) !important;
-    box-shadow: 0 0 10px rgba(217, 74, 74, 0.15) !important;
+    border-color: var(--cv-danger-border) !important;
+    background: var(--cv-danger-bg) !important;
 }
 .kpi-header {
     display: flex;
@@ -477,17 +481,17 @@ iframe {
 }
 .kpi-title {
     font-size: 11.5px;
-    font-weight: 600;
+    font-weight: 500;
     color: var(--cv-text-secondary);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 .kpi-value {
-    font-size: 25px;
+    font-size: 24px;
     font-weight: 700;
-    color: var(--cv-text);
-    letter-spacing: -0.5px;
+    color: #111827;
+    letter-spacing: -0.4px;
     line-height: 1.1;
     margin-bottom: 4px;
 }
@@ -495,41 +499,41 @@ iframe {
     display: inline-block;
     align-self: flex-start;
     padding: 2px 7px;
-    border-radius: 10px;
-    font-size: 10px;
-    font-weight: 600;
+    border-radius: 6px;
+    font-size: 10.5px;
+    font-weight: 500;
     white-space: nowrap;
 }
 .badge-coral {
-    background: rgba(217, 74, 74, 0.12);
+    background: var(--cv-danger-bg);
     color: var(--cv-danger);
-    border: 1px solid rgba(217, 74, 74, 0.25);
+    border: 1px solid var(--cv-danger-border);
 }
 .badge-cyan,
 .badge-copper {
-    background: rgba(232, 117, 50, 0.12);
-    color: var(--cv-primary);
-    border: 1px solid rgba(232, 117, 50, 0.25);
+    background: #FFF7ED;
+    color: #9A3412;
+    border: 1px solid #FFEDD5;
 }
 .badge-emerald {
-    background: rgba(35, 134, 91, 0.12);
+    background: var(--cv-success-bg);
     color: var(--cv-success);
-    border: 1px solid rgba(35, 134, 91, 0.25);
+    border: 1px solid var(--cv-success-border);
 }
 .badge-amber {
-    background: rgba(217, 149, 40, 0.12);
+    background: var(--cv-warning-bg);
     color: var(--cv-warning);
-    border: 1px solid rgba(217, 149, 40, 0.25);
+    border: 1px solid var(--cv-warning-border);
 }
 .badge-purple {
-    background: rgba(232, 117, 50, 0.12);
-    color: var(--cv-primary);
-    border: 1px solid rgba(232, 117, 50, 0.25);
+    background: #F5F3FF;
+    color: #5B21B6;
+    border: 1px solid #DDD6FE;
 }
 .badge-red {
-    background: rgba(217, 74, 74, 0.12);
+    background: var(--cv-danger-bg);
     color: var(--cv-danger);
-    border: 1px solid rgba(217, 74, 74, 0.25);
+    border: 1px solid var(--cv-danger-border);
 }
 
 /* Card Surface Containers */
@@ -538,15 +542,15 @@ iframe {
     border: 1px solid var(--cv-border);
     border-radius: var(--cv-radius-sm);
     padding: 14px 16px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
     margin-bottom: 12px;
 }
 .cv-video-meta {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 9px 14px;
-    background: var(--cv-surface-alt);
+    padding: 8px 14px;
+    background: #F9FAFB;
     border: 1px solid var(--cv-border);
     border-bottom: none;
     border-radius: 8px 8px 0 0;
@@ -556,22 +560,22 @@ iframe {
     display: flex;
     align-items: center;
     gap: 8px;
-    color: var(--cv-text);
+    color: #111827;
     font-weight: 500;
     flex-wrap: wrap;
 }
 .cv-meta-dot {
-    color: var(--cv-text-muted);
+    color: #D1D5DB;
 }
 
 /* Upload Dropzone Styling */
 [data-testid="stFileUploader"] {
     background: var(--cv-surface) !important;
-    border: 1.5px dashed var(--cv-border) !important;
+    border: 1.5px dashed #D1D5DB !important;
     border-radius: var(--cv-radius-sm) !important;
-    padding: 24px 16px !important;
+    padding: 22px 16px !important;
     text-align: center !important;
-    transition: border-color 0.2s ease !important;
+    transition: border-color 0.15s ease !important;
 }
 [data-testid="stFileUploader"]:hover {
     border-color: var(--cv-primary) !important;
@@ -580,26 +584,26 @@ iframe {
     background: var(--cv-primary) !important;
     border: 1px solid var(--cv-primary-hover) !important;
     color: #ffffff !important;
-    font-weight: 600 !important;
+    font-weight: 500 !important;
     border-radius: 6px !important;
-    padding: 6px 18px !important;
+    padding: 5px 16px !important;
     font-size: 13px !important;
-    box-shadow: 0 2px 8px rgba(232, 117, 50, 0.3) !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
 }
 [data-testid="stFileUploader"] button:hover {
     background: var(--cv-primary-hover) !important;
     border-color: var(--cv-primary-dark) !important;
 }
 
-/* Custom Tabs Matching Pill Design */
+/* Custom Tabs Matching Segmented Control */
 div[data-testid="stTabs"] {
     margin-top: 6px;
     margin-bottom: 12px;
 }
 div[data-testid="stTabs"] div[role="tablist"] {
-    gap: 6px;
-    background: var(--cv-surface-alt);
-    padding: 5px 6px;
+    gap: 4px;
+    background: #F3F4F6;
+    padding: 4px;
     border-radius: 8px;
     border: 1px solid var(--cv-border);
     display: inline-flex;
@@ -607,7 +611,7 @@ div[data-testid="stTabs"] div[role="tablist"] {
 div[data-testid="stTabs"] button[role="tab"] {
     background: transparent !important;
     border: none !important;
-    color: var(--cv-text-secondary) !important;
+    color: #4B5563 !important;
     border-radius: 6px !important;
     padding: 6px 14px !important;
     font-size: 12.5px !important;
@@ -615,15 +619,15 @@ div[data-testid="stTabs"] button[role="tab"] {
     transition: all 0.15s ease !important;
 }
 div[data-testid="stTabs"] button[role="tab"]:hover {
-    color: var(--cv-text) !important;
-    background: var(--cv-surface) !important;
+    color: #111827 !important;
+    background: rgba(255, 255, 255, 0.6) !important;
 }
 div[data-testid="stTabs"] button[role="tab"][aria-selected="true"] {
-    background: var(--cv-primary) !important;
-    border: 1px solid var(--cv-primary-hover) !important;
-    color: #ffffff !important;
+    background: #FFFFFF !important;
+    border: 1px solid #E5E7EB !important;
+    color: #111827 !important;
     font-weight: 600 !important;
-    box-shadow: 0 2px 8px rgba(232, 117, 50, 0.3) !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
 }
 div[data-testid="stTabs"] hr {
     display: none !important;
@@ -640,7 +644,7 @@ input, select, textarea, [data-baseweb="select"], [data-baseweb="input"] {
     border: 1px solid var(--cv-border) !important;
     border-radius: var(--cv-radius-sm) !important;
     padding: 10px 14px !important;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03) !important;
 }
 [data-testid="stMetricLabel"] {
     color: var(--cv-text-secondary) !important;
@@ -648,7 +652,7 @@ input, select, textarea, [data-baseweb="select"], [data-baseweb="input"] {
     font-weight: 500 !important;
 }
 [data-testid="stMetricValue"] {
-    color: var(--cv-text) !important;
+    color: #111827 !important;
     font-weight: 700 !important;
 }
 
@@ -657,14 +661,14 @@ input, select, textarea, [data-baseweb="select"], [data-baseweb="input"] {
     background: var(--cv-surface) !important;
     border: 1px solid var(--cv-border) !important;
     border-radius: var(--cv-radius-sm) !important;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03) !important;
 }
 [data-testid="stExpander"] summary {
-    color: var(--cv-text) !important;
+    color: #111827 !important;
     font-weight: 600 !important;
 }
 
-h1, h2, h3, h4 { color: var(--cv-text) !important; }
+h1, h2, h3, h4 { color: #111827 !important; }
 .stMarkdown p { color: var(--cv-text-secondary); }
 </style>
 ''', unsafe_allow_html=True)
@@ -720,7 +724,7 @@ def render_page_header(title, subtitle=""):
     <div class="cv-page-header">
       <div>
         <div class="cv-page-title">
-          <span style="color:#E87532;margin-right:8px;font-size:20px;">🎬</span> {title}
+          <span style="color:#C25E2E;margin-right:8px;font-size:18px;">🎬</span> {title}
         </div>
         {sub_html}
       </div>
@@ -794,13 +798,13 @@ def render_top_navigation():
             storage_ok = OUTPUTS.is_dir() and os.access(OUTPUTS, os.W_OK)
             if weights_ok and storage_ok:
                 status_text = "System Ready (CUDA)" if has_cuda else "System Ready (CPU)"
-                status_color = "#23865B"
+                status_color = "#059669"
             elif not weights_ok:
                 status_text = "Weights Missing"
-                status_color = "#D94A4A"
+                status_color = "#DC2626"
             else:
                 status_text = "Storage Error"
-                status_color = "#D94A4A"
+                status_color = "#DC2626"
 
             st.markdown(f'''
             <div style="display:flex;justify-content:flex-end;">
@@ -1131,16 +1135,16 @@ if page == 'System Health':
 
     h1, h2, h3, h4 = st.columns(4)
     with h1:
-        st.markdown(f'''<div class="kpi-card"><div class="kpi-header"><span class="kpi-icon" style="color:#23865B;">🧠</span><span class="kpi-title">Inference Engine</span></div><div class="kpi-value" style="font-size:18px;">YOLO11m</div><div class="kpi-badge {'badge-emerald' if weights_ok else 'badge-red'}">{'Checkpoint Ready' if weights_ok else 'Weights Missing'}</div></div>''', unsafe_allow_html=True)
+        st.markdown(f'''<div class="kpi-card"><div class="kpi-header"><span class="kpi-icon" style="color:#059669;">🧠</span><span class="kpi-title">Inference Engine</span></div><div class="kpi-value" style="font-size:18px;">YOLO11m</div><div class="kpi-badge {'badge-emerald' if weights_ok else 'badge-red'}">{'Checkpoint Ready' if weights_ok else 'Weights Missing'}</div></div>''', unsafe_allow_html=True)
     with h2:
         prov_text = "CUDA GPU" if has_cuda else "CPU Host"
         prov_sub = gpu_name[:16] if has_cuda else f"{threads} Worker Threads"
-        st.markdown(f'''<div class="kpi-card"><div class="kpi-header"><span class="kpi-icon" style="color:#E87532;">⚡</span><span class="kpi-title">Hardware Provider</span></div><div class="kpi-value" style="font-size:18px;">{prov_text}</div><div class="kpi-badge badge-amber">{prov_sub}</div></div>''', unsafe_allow_html=True)
+        st.markdown(f'''<div class="kpi-card"><div class="kpi-header"><span class="kpi-icon" style="color:#D97706;">⚡</span><span class="kpi-title">Hardware Provider</span></div><div class="kpi-value" style="font-size:18px;">{prov_text}</div><div class="kpi-badge badge-amber">{prov_sub}</div></div>''', unsafe_allow_html=True)
     with h3:
-        st.markdown(f'''<div class="kpi-card"><div class="kpi-header"><span class="kpi-icon" style="color:#3D78A8;">💾</span><span class="kpi-title">Session Storage</span></div><div class="kpi-value" style="font-size:18px;">{mb(used_bytes)}</div><div class="kpi-badge {'badge-cyan' if storage_writable else 'badge-red'}">{'Quota: ' + str(int(limit_gb)) + ' GB' if storage_writable else 'Read-Only Disk'}</div></div>''', unsafe_allow_html=True)
+        st.markdown(f'''<div class="kpi-card"><div class="kpi-header"><span class="kpi-icon" style="color:#2563EB;">💾</span><span class="kpi-title">Session Storage</span></div><div class="kpi-value" style="font-size:18px;">{mb(used_bytes)}</div><div class="kpi-badge {'badge-cyan' if storage_writable else 'badge-red'}">{'Quota: ' + str(int(limit_gb)) + ' GB' if storage_writable else 'Read-Only Disk'}</div></div>''', unsafe_allow_html=True)
     with h4:
         cam_sub = f"{verified_cams}/{total_cams} Feeds Verified" if total_cams else "Standby (No Feeds)"
-        st.markdown(f'''<div class="kpi-card"><div class="kpi-header"><span class="kpi-icon" style="color:#23865B;">🛡</span><span class="kpi-title">System Status</span></div><div class="kpi-value" style="font-size:18px;">{health_status}</div><div class="kpi-badge {health_badge}">{cam_sub}</div></div>''', unsafe_allow_html=True)
+        st.markdown(f'''<div class="kpi-card"><div class="kpi-header"><span class="kpi-icon" style="color:#059669;">🛡</span><span class="kpi-title">System Status</span></div><div class="kpi-value" style="font-size:18px;">{health_status}</div><div class="kpi-badge {health_badge}">{cam_sub}</div></div>''', unsafe_allow_html=True)
 
     st.markdown('### Runtime Diagnostic Details')
     diag_df = pd.DataFrame([
@@ -1191,7 +1195,7 @@ if page == 'System Health':
 if page == 'Live Monitoring':
     render_page_header('Live Monitoring & RTSP Surveillance', 'Connect IP surveillance cameras or local devices for real-time occupancy monitoring.')
     st.subheader('Live RTSP IP camera surveillance center')
-    st.markdown('<div style="color:#777777;margin-bottom:14px;font-size:13.5px;">Connect IP surveillance cameras, NVR streams, or webcams for real-time occupancy counting, capacity alerts, and live recording.</div>', unsafe_allow_html=True)
+    st.markdown('<div style="color:#6B7280;margin-bottom:14px;font-size:13px;">Connect IP surveillance cameras, NVR streams, or webcams for real-time occupancy counting, capacity alerts, and live recording.</div>', unsafe_allow_html=True)
 
     saved_cams = load_camera_registry()
 
@@ -1321,10 +1325,10 @@ if page == 'Live Monitoring':
             c_ctrl1, c_ctrl2 = st.columns([3, 1])
             with c_ctrl1:
                 st.markdown(
-                    f'''<div style="background:#FFFFFF;border:1px solid #E7E3DC;padding:10px 14px;border-radius:8px;display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+                    f'''<div style="background:#FFFFFF;border:1px solid #E5E7EB;padding:8px 14px;border-radius:8px;display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;box-shadow:0 1px 2px rgba(0,0,0,0.03);">
                         <div style="display:flex;align-items:center;gap:10px;">
-                            <span style="color:#D94A4A;font-weight:700;font-size:13px;">● LIVE SURVEILLANCE</span>
-                            <span style="color:#777777;font-size:12.5px;">· {active_loc} (Cap: {active_cap})</span>
+                            <span style="color:#DC2626;font-weight:600;font-size:12.5px;">● LIVE SURVEILLANCE</span>
+                            <span style="color:#6B7280;font-size:12px;">· {active_loc} (Cap: {active_cap})</span>
                         </div>
                     </div>''',
                     unsafe_allow_html=True
@@ -1547,7 +1551,7 @@ if page == 'Activity & History':
 
     with tab_analytics:
         st.subheader('Cross-zone historical analytics & surge telemetry')
-        st.markdown('<div style="color:#777777;margin-bottom:14px;font-size:13.5px;">Comparative occupancy curves, congestion indices, and bidirectional turnstile velocity.</div>', unsafe_allow_html=True)
+        st.markdown('<div style="color:#6B7280;margin-bottom:14px;font-size:13px;">Comparative occupancy curves, congestion indices, and bidirectional turnstile velocity.</div>', unsafe_allow_html=True)
         a1, a2 = st.columns([1.8, 1.2])
         with a1:
             st.markdown('**Concourse Surge Timeline (Observation Window)**')
@@ -1562,7 +1566,7 @@ if page == 'Activity & History':
 
     with tab_events:
         st.subheader('Safety exceedance incidents & audit log')
-        st.markdown('<div style="color:#777777;margin-bottom:14px;font-size:13.5px;">Chronological audit of sustained crowding exceeding capacity limits for >3.0 seconds.</div>', unsafe_allow_html=True)
+        st.markdown('<div style="color:#6B7280;margin-bottom:14px;font-size:13px;">Chronological audit of sustained crowding exceeding capacity limits for >3.0 seconds.</div>', unsafe_allow_html=True)
         events_data = [
             {'Incident': '#EVT-01', 'Location': 'Campus entrance', 'Start': '00:02.0', 'Duration': '8.5s', 'Peak': '174 heads', 'Threshold': '80 heads', 'Severity': 'Critical (217%)', 'Status': 'Reviewed'},
             {'Incident': '#EVT-02', 'Location': 'Central Cafeteria', 'Start': '12:45.0', 'Duration': '4.2s', 'Peak': '148 heads', 'Threshold': '140 heads', 'Severity': 'Moderate (105%)', 'Status': 'Resolved'},
@@ -1578,12 +1582,12 @@ if page == 'Activity & History':
 if page == 'Reports':
     render_page_header('Compliance Reports & Data Exports', 'Generate PDF inspection certificates and export timestamped counting telemetry.')
     st.subheader('Formal compliance reports & data exports')
-    st.markdown('<div style="color:#777777;margin-bottom:14px;font-size:13.5px;">Generate PDF inspection certificates and export timestamped counting telemetry.</div>', unsafe_allow_html=True)
+    st.markdown('<div style="color:#6B7280;margin-bottom:14px;font-size:13px;">Generate PDF inspection certificates and export timestamped counting telemetry.</div>', unsafe_allow_html=True)
     rec = st.session_state.get('result')
     if rec:
         r1, r2, r3 = st.columns(3)
         with r1:
-            st.markdown('''<div class="cv-panel-card"><div style="font-size:24px;margin-bottom:4px;">📄</div><div style="font-weight:700;color:#252525;">Formal Audit PDF</div><div style="font-size:12px;color:#777777;margin-bottom:10px;">Executive compliance report with telemetry charts.</div></div>''', unsafe_allow_html=True)
+            st.markdown('''<div class="cv-panel-card"><div style="font-size:24px;margin-bottom:4px;">📄</div><div style="font-weight:700;color:#111827;">Formal Audit PDF</div><div style="font-size:12px;color:#6B7280;margin-bottom:10px;">Executive compliance report with telemetry charts.</div></div>''', unsafe_allow_html=True)
             pdf_path = OUTPUTS / 'campus-occupancy-report.pdf'
             if st.button('Generate PDF Audit Report', width='stretch'):
                 try:
@@ -1597,7 +1601,7 @@ if page == 'Reports':
             st.markdown('''<div class="cv-panel-card"><div style="font-size:24px;margin-bottom:4px;">📊</div><div style="font-weight:700;color:#252525;">Telemetry CSV Data</div><div style="font-size:12px;color:#777777;margin-bottom:10px;">Per-frame head counts, timestamps, and capacity load.</div></div>''', unsafe_allow_html=True)
             st.download_button('📥 Download Telemetry CSV', csv_bytes(rec), file_name='occupancy-telemetry.csv', mime='text/csv', width='stretch')
         with r3:
-            st.markdown('''<div class="cv-panel-card"><div style="font-size:24px;margin-bottom:4px;">🎥</div><div style="font-weight:700;color:#252525;">Annotated HD Video</div><div style="font-size:12px;color:#777777;margin-bottom:10px;">H.264 CRF 21 video with tracked heads & polygon.</div></div>''', unsafe_allow_html=True)
+            st.markdown('''<div class="cv-panel-card"><div style="font-size:24px;margin-bottom:4px;">🎥</div><div style="font-weight:700;color:#111827;">Annotated HD Video</div><div style="font-size:12px;color:#6B7280;margin-bottom:10px;">H.264 CRF 21 video with tracked heads & polygon.</div></div>''', unsafe_allow_html=True)
             ann_p = Path(rec.get('annotated_path', ''))
             if ann_p.is_file():
                 st.download_button('📥 Download Annotated MP4', ann_p.read_bytes(), file_name=ann_p.name, mime='video/mp4', width='stretch')
@@ -1661,7 +1665,7 @@ def render_kpi_section(record, settings):
       <!-- 1. Peak Occupancy -->
       <div class="kpi-card {'kpi-card-critical' if peak_pct >= 85 else ''}">
         <div class="kpi-header">
-          <span class="kpi-icon" style="color:#D94A4A;">👥</span>
+          <span class="kpi-icon" style="color:#DC2626;">👥</span>
           <span class="kpi-title">Peak Occupancy</span>
         </div>
         <div class="kpi-value">{peak_count}</div>
@@ -1670,7 +1674,7 @@ def render_kpi_section(record, settings):
       <!-- 2. Average Occupancy -->
       <div class="kpi-card">
         <div class="kpi-header">
-          <span class="kpi-icon" style="color:#E87532;">👥</span>
+          <span class="kpi-icon" style="color:#C25E2E;">👥</span>
           <span class="kpi-title">Average Occupancy</span>
         </div>
         <div class="kpi-value">{avg_count:.0f}</div>
@@ -1679,7 +1683,7 @@ def render_kpi_section(record, settings):
       <!-- 3. Capacity Events -->
       <div class="kpi-card">
         <div class="kpi-header">
-          <span class="kpi-icon" style="color:#D99528;">⚠️</span>
+          <span class="kpi-icon" style="color:#D97706;">⚠️</span>
           <span class="kpi-title">Capacity Events</span>
         </div>
         <div class="kpi-value">{len(events)}</div>
@@ -1688,7 +1692,7 @@ def render_kpi_section(record, settings):
       <!-- 4. Analyzed Duration -->
       <div class="kpi-card">
         <div class="kpi-header">
-          <span class="kpi-icon" style="color:#23865B;">⏱</span>
+          <span class="kpi-icon" style="color:#059669;">⏱</span>
           <span class="kpi-title">Analyzed Duration</span>
         </div>
         <div class="kpi-value">{source_dur:.1f} s</div>
@@ -1697,7 +1701,7 @@ def render_kpi_section(record, settings):
       <!-- 5. Total Samples -->
       <div class="kpi-card">
         <div class="kpi-header">
-          <span class="kpi-icon" style="color:#3D78A8;">📚</span>
+          <span class="kpi-icon" style="color:#2563EB;">📚</span>
           <span class="kpi-title">Total Samples</span>
         </div>
         <div class="kpi-value">{samples_cnt}</div>
@@ -1706,7 +1710,7 @@ def render_kpi_section(record, settings):
       <!-- 6. Inference FPS -->
       <div class="kpi-card">
         <div class="kpi-header">
-          <span class="kpi-icon" style="color:#E87532;">⚡</span>
+          <span class="kpi-icon" style="color:#D97706;">⚡</span>
           <span class="kpi-title">Inference FPS</span>
         </div>
         <div class="kpi-value">{fps_proc:.0f}</div>
@@ -1715,7 +1719,7 @@ def render_kpi_section(record, settings):
       <!-- 7. Crowd Density -->
       <div class="kpi-card">
         <div class="kpi-header">
-          <span class="kpi-icon" style="color:#23865B;">📊</span>
+          <span class="kpi-icon" style="color:#059669;">📊</span>
           <span class="kpi-title">Crowd Density</span>
         </div>
         <div class="kpi-value">{density_val:.2f}×</div>
@@ -1744,7 +1748,7 @@ def render_analytics_section(record, settings):
         with col_c1:
             st.markdown('''
             <div style="display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:700;color:#252525;margin-bottom:2px;">
-              <span style="color:#E87532;">👥</span> Occupancy Over Time
+              <span style="color:#C25E2E;">👥</span> Occupancy Over Time
             </div>
             ''', unsafe_allow_html=True)
             occ_fig = create_occupancy_timeline(
@@ -1758,8 +1762,8 @@ def render_analytics_section(record, settings):
 
         with col_c2:
             st.markdown('''
-            <div style="display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:700;color:#252525;margin-bottom:2px;">
-              <span style="color:#D99528;">⇄</span> Entry vs Exit Flow
+            <div style="display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:700;color:#111827;margin-bottom:2px;">
+              <span style="color:#D97706;">⇄</span> Entry vs Exit Flow
             </div>
             ''', unsafe_allow_html=True)
             fwd = record.get('forward_crossings', 0)
@@ -1774,7 +1778,7 @@ def render_analytics_section(record, settings):
 
     with tab_map:
         st.markdown('''
-        <div style="display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:700;color:#252525;margin-bottom:4px;">
+        <div style="display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:700;color:#111827;margin-bottom:4px;">
           <span>🗺</span> Spatial Density Map (Crowd Concentration Heatmap)
         </div>
         ''', unsafe_allow_html=True)
@@ -1783,7 +1787,7 @@ def render_analytics_section(record, settings):
 
     with tab_timeline:
         st.markdown('''
-        <div style="display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:700;color:#252525;margin-bottom:4px;">
+        <div style="display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:700;color:#111827;margin-bottom:4px;">
           <span>📅</span> Sustained Capacity Exceedances (Incident Episodes)
         </div>
         ''', unsafe_allow_html=True)
@@ -1812,7 +1816,7 @@ def render_analytics_section(record, settings):
 
     with tab_summary:
         st.markdown('''
-        <div style="display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:700;color:#252525;margin-bottom:8px;">
+        <div style="display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:700;color:#111827;margin-bottom:8px;">
           <span>📄</span> Executive Takeaways & Safety Compliance Scorecard
         </div>
         ''', unsafe_allow_html=True)
@@ -1822,8 +1826,8 @@ def render_analytics_section(record, settings):
             with col:
                 st.markdown(f'''
                 <div class="cv-panel-card" style="height:100%;">
-                  <div style="font-weight:700;color:#252525;font-size:13px;margin-bottom:4px;">{ins['icon']} {ins['title']}</div>
-                  <div style="font-size:11.5px;color:#777777;line-height:1.5;">{ins['desc']}</div>
+                  <div style="font-weight:700;color:#111827;font-size:13px;margin-bottom:4px;">{ins['icon']} {ins['title']}</div>
+                  <div style="font-size:11.5px;color:#6B7280;line-height:1.5;">{ins['desc']}</div>
                 </div>
                 ''', unsafe_allow_html=True)
 
@@ -1887,7 +1891,7 @@ def render_results(record):
         <div class="cv-video-meta">
           <div class="cv-meta-left">
             <span style="font-size:14px;">🎞</span>
-            <span style="font-weight:700;color:#252525;">{record['file_name']}</span>
+            <span style="font-weight:700;color:#111827;">{record['file_name']}</span>
             <span class="cv-meta-dot">·</span>
             <span>{record.get('output_width', 1920)} × {record.get('output_height', 1080)}</span>
             <span class="cv-meta-dot">·</span>
@@ -1911,7 +1915,7 @@ def render_results(record):
     with c_cfg:
         st.markdown('''
         <div class="cv-panel-card" style="margin-bottom:8px;padding:12px 14px;">
-          <div style="display:flex;align-items:center;gap:8px;font-size:14.5px;font-weight:700;color:#252525;">
+          <div style="display:flex;align-items:center;gap:8px;font-size:14.5px;font-weight:700;color:#111827;">
             <span>⚙</span> Analysis Setup
           </div>
         </div>
@@ -1946,14 +1950,14 @@ def render_empty_state():
     with st.container(border=True):
         st.markdown('''
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
-          <div style="width:38px;height:38px;border-radius:8px;background:#F0EEE9;border:1px solid #E7E3DC;display:flex;align-items:center;justify-content:center;color:#E87532;font-size:18px;flex-shrink:0;">
+          <div style="width:36px;height:36px;border-radius:8px;background:#F3F4F6;border:1px solid #E5E7EB;display:flex;align-items:center;justify-content:center;color:#C25E2E;font-size:17px;flex-shrink:0;">
             ☁
           </div>
           <div>
-            <div style="font-size:15px;font-weight:700;color:#252525;line-height:1.2;">
+            <div style="font-size:15px;font-weight:600;color:#111827;line-height:1.2;">
               Upload Recorded Footage
             </div>
-            <div style="font-size:12px;color:#777777;margin-top:2px;">
+            <div style="font-size:12px;color:#6B7280;margin-top:2px;">
               Upload a campus video or image to begin crowd analysis.
             </div>
           </div>
@@ -2009,15 +2013,15 @@ def render_empty_state():
             st.markdown('</div>', unsafe_allow_html=True)
         with col_priv:
             st.markdown('''
-            <div style="display:flex;align-items:center;height:100%;font-size:12px;color:#777777;gap:6px;padding-left:4px;">
-              <span style="color:#23865B;font-size:13px;">🔒</span>
-              <span><strong style="color:#252525;">Local Processing</strong> · Video inference runs locally on your machine.</span>
+            <div style="display:flex;align-items:center;height:100%;font-size:12px;color:#6B7280;gap:6px;padding-left:4px;">
+              <span style="color:#059669;font-size:13px;">🔒</span>
+              <span><strong style="color:#111827;">Local Processing</strong> · Video inference runs locally on your machine.</span>
             </div>
             ''', unsafe_allow_html=True)
 
     st.markdown('''
-    <div style="display:flex;align-items:center;gap:8px;font-size:14.5px;font-weight:700;color:#252525;margin-top:14px;margin-bottom:10px;">
-      <span style="font-size:16px;">📚</span>
+    <div style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;color:#111827;margin-top:14px;margin-bottom:10px;">
+      <span style="font-size:15px;">📚</span>
       <span>CrowdVision Capabilities</span>
     </div>
     ''', unsafe_allow_html=True)
@@ -2026,7 +2030,7 @@ def render_empty_state():
     with c1:
         st.markdown('''
         <div class="cv-capability-card">
-          <div class="cv-cap-icon" style="color:#E87532;">👥</div>
+          <div class="cv-cap-icon" style="color:#C25E2E;">👥</div>
           <div class="cv-cap-title">Crowd Detection & Occupancy</div>
           <div class="cv-cap-desc">YOLO11-based people detection and occupancy counting.</div>
         </div>
@@ -2034,7 +2038,7 @@ def render_empty_state():
     with c2:
         st.markdown('''
         <div class="cv-capability-card">
-          <div class="cv-cap-icon" style="color:#D99528;">⇄</div>
+          <div class="cv-cap-icon" style="color:#D97706;">⇄</div>
           <div class="cv-cap-title">Directional Flow Analysis</div>
           <div class="cv-cap-desc">Track movement and calculate entry and exit flow.</div>
         </div>
@@ -2042,7 +2046,7 @@ def render_empty_state():
     with c3:
         st.markdown('''
         <div class="cv-capability-card">
-          <div class="cv-cap-icon" style="color:#D94A4A;">⚠️</div>
+          <div class="cv-cap-icon" style="color:#DC2626;">⚠️</div>
           <div class="cv-cap-title">Safety & Incident Detection</div>
           <div class="cv-cap-desc">Monitor capacity limits and detect sustained crowding.</div>
         </div>
@@ -2113,7 +2117,7 @@ with col_left:
     <div class="cv-video-meta">
       <div class="cv-meta-left">
         <span style="font-size:14px;">🎞</span>
-        <span style="font-weight:700;color:#252525;">{file_display_name}</span>
+        <span style="font-weight:700;color:#111827;">{file_display_name}</span>
         <span class="cv-meta-dot">·</span>
         <span>{frame.shape[1]} × {frame.shape[0]}</span>
         <span class="cv-meta-dot">·</span>

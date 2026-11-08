@@ -1,6 +1,6 @@
 """
 High-definition interactive Plotly charts and operational analytics for CrowdVision.
-Engineered to strictly match the warm-white and burnt-orange design system.
+Engineered with a subtle, production-grade enterprise design system.
 """
 from __future__ import annotations
 import math
@@ -9,22 +9,22 @@ import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-# Enterprise Warm-White & Burnt-Orange Design System Palette
-MAIN_BG = '#F7F5F0'
+# Production Enterprise Palette (Subtle, Muted, Refined)
+MAIN_BG = '#F8F9FA'
 CARD_BG = '#FFFFFF'
-SURFACE_BG = '#F0EEE9'
-BORDER_COLOR = '#E7E3DC'
-PRIMARY = '#E87532'
-PURPLE = '#E87532'   # Backwards compatibility alias
-SECONDARY = '#D99528'
-CYAN = '#3D78A8'     # Backwards compatibility alias
-EMERALD = '#23865B'  # Forest green success
-AMBER = '#D99528'    # Warm amber highlight
-WARNING = '#D99528'  # Burnt amber warning
-CORAL = '#D94A4A'    # Muted crimson danger
-TEXT_PRIMARY = '#252525'
-TEXT_SECONDARY = '#777777'
-TEXT_MUTED = '#999999'
+SURFACE_BG = '#F1F3F5'
+BORDER_COLOR = '#E5E7EB'
+PRIMARY = '#C25E2E'   # Muted terracotta copper
+PURPLE = '#C25E2E'    # Backwards compatibility alias
+SECONDARY = '#D97706' # Muted warm amber
+CYAN = '#2563EB'      # Slate blue
+EMERALD = '#059669'   # Production emerald green
+AMBER = '#D97706'     # Muted amber warning
+WARNING = '#D97706'   # Warning threshold
+CORAL = '#DC2626'     # Production crimson
+TEXT_PRIMARY = '#1F2937'
+TEXT_SECONDARY = '#6B7280'
+TEXT_MUTED = '#9CA3AF'
 
 
 def create_occupancy_timeline(
@@ -37,9 +37,9 @@ def create_occupancy_timeline(
     """
     Generate the flagship 'Occupancy Over Time' chart matching the reference UI.
     Features:
-    - Burnt orange spline curve with markers (#E87532)
-    - Dashed capacity threshold (#D99528)
-    - Clean warm-white canvas (#FFFFFF)
+    - Subtle terracotta spline curve with clean markers (#C25E2E)
+    - Dashed capacity threshold (#D97706)
+    - Clean white canvas (#FFFFFF) with delicate grid lines
     - Crisp 'Time (s)' and 'People' axes
     """
     fig = go.Figure()
@@ -48,7 +48,7 @@ def create_occupancy_timeline(
         fig.add_annotation(
             text="No timeline observations recorded",
             showarrow=False,
-            font=dict(color=TEXT_SECONDARY, size=14, family="Inter, system-ui")
+            font=dict(color=TEXT_SECONDARY, size=13, family="Inter, system-ui")
         )
         fig.update_layout(paper_bgcolor=CARD_BG, plot_bgcolor=CARD_BG)
         return fig
@@ -60,7 +60,7 @@ def create_occupancy_timeline(
     fig.add_hrect(
         y0=capacity,
         y1=y_max,
-        fillcolor="rgba(217, 74, 74, 0.08)",
+        fillcolor="rgba(220, 38, 38, 0.05)",
         line_width=0,
     )
 
@@ -70,7 +70,7 @@ def create_occupancy_timeline(
         y=[capacity, capacity],
         mode='lines',
         name=f'Capacity ({capacity})',
-        line=dict(color=WARNING, width=2, dash='dash'),
+        line=dict(color=WARNING, width=1.5, dash='dash'),
         hoverinfo='skip',
     ))
 
@@ -80,7 +80,7 @@ def create_occupancy_timeline(
         y=counts,
         mode='lines+markers',
         name='Occupancy',
-        line=dict(color=PRIMARY, width=2.5, shape='spline', smoothing=0.8),
+        line=dict(color=PRIMARY, width=2.2, shape='spline', smoothing=0.8),
         marker=dict(
             color=PRIMARY,
             size=5,
@@ -102,13 +102,13 @@ def create_occupancy_timeline(
         showarrow=True,
         arrowhead=2,
         arrowsize=1,
-        arrowwidth=2,
+        arrowwidth=1.5,
         arrowcolor=PRIMARY,
         ax=0,
-        ay=-32,
+        ay=-30,
         bgcolor='#FFFFFF',
         bordercolor=PRIMARY,
-        borderwidth=1.5,
+        borderwidth=1,
         borderpad=4,
         font=dict(color=TEXT_PRIMARY, size=11, family='Inter, system-ui'),
     )
@@ -132,7 +132,7 @@ def create_occupancy_timeline(
             title=dict(text="Time (s)", font=dict(size=12, color=TEXT_SECONDARY)),
             tickfont=dict(size=11, color=TEXT_SECONDARY),
             showgrid=True,
-            gridcolor="rgba(0, 0, 0, 0.05)",
+            gridcolor="rgba(0, 0, 0, 0.04)",
             zeroline=False,
             showline=True,
             linecolor=BORDER_COLOR,
@@ -141,7 +141,7 @@ def create_occupancy_timeline(
             title=dict(text="People", font=dict(size=12, color=TEXT_SECONDARY)),
             tickfont=dict(size=11, color=TEXT_SECONDARY),
             showgrid=True,
-            gridcolor="rgba(0, 0, 0, 0.05)",
+            gridcolor="rgba(0, 0, 0, 0.04)",
             zeroline=False,
             showline=True,
             linecolor=BORDER_COLOR,
@@ -158,10 +158,10 @@ def create_flow_dynamics_chart(
     """
     Generate the 'Entry vs Exit Flow' bar chart matching the reference UI.
     Features:
-    - Entry bar in forest green (#23865B)
-    - Exit bar in crimson red (#D94A4A)
+    - Entry bar in clean emerald green (#059669)
+    - Exit bar in crimson red (#DC2626)
     - Clean value labels atop each bar
-    - Crisp white card background (#FFFFFF)
+    - Subtle white card background (#FFFFFF)
     """
     fig = go.Figure()
 
@@ -203,7 +203,7 @@ def create_flow_dynamics_chart(
             title=dict(text="Count", font=dict(size=12, color=TEXT_SECONDARY)),
             tickfont=dict(size=11, color=TEXT_SECONDARY),
             showgrid=True,
-            gridcolor="rgba(0, 0, 0, 0.05)",
+            gridcolor="rgba(0, 0, 0, 0.04)",
             zeroline=False,
             showline=True,
             linecolor=BORDER_COLOR,
@@ -292,11 +292,11 @@ def create_density_heatmap_fig(density_matrix: Optional[np.ndarray] = None) -> g
     fig.add_trace(go.Heatmap(
         z=density_matrix,
         colorscale=[
-            [0.0, '#F7F5F0'],
-            [0.25, '#F0EEE9'],
-            [0.5, '#E87532'],
-            [0.75, '#D99528'],
-            [1.0, '#D94A4A'],
+            [0.0, '#F8F9FA'],
+            [0.25, '#F1F3F5'],
+            [0.5, '#C25E2E'],
+            [0.75, '#D97706'],
+            [1.0, '#DC2626'],
         ],
         colorbar=dict(
             title=dict(text="Density (heads/m²)", font=dict(size=10, color=TEXT_SECONDARY)),
@@ -352,7 +352,7 @@ def create_events_timeline_fig(events: List[dict], duration: float = 11.2, capac
             title=dict(text="Time into footage (seconds)", font=dict(size=11, color=TEXT_SECONDARY)),
             tickfont=dict(size=10, color=TEXT_SECONDARY),
             showgrid=True,
-            gridcolor="rgba(0, 0, 0, 0.05)",
+            gridcolor="rgba(0, 0, 0, 0.04)",
             range=[0, max(duration, 12)],
         ),
         yaxis=dict(
@@ -378,14 +378,14 @@ def generate_operational_insights(record: dict, settings: dict) -> List[Dict[str
             'icon': '🚨',
             'title': 'Severe Capacity Exceedance',
             'level': 'danger',
-            'desc': f"Peak occupancy surged to {max_count} heads ({peak_pct:.0f}% of designated {capacity} limit). Queue dispersal protocol advised.",
+            'desc': f"Peak occupancy surged to {max_count} heads ({peak_pct:.0f}% of designated {capacity} limit). Dispersal protocol advised.",
         })
     elif peak_pct >= 85:
         insights.append({
             'icon': '⚠️',
             'title': 'High Crowd Warning',
             'level': 'warning',
-            'desc': f"Peak occupancy touched {max_count} heads ({peak_pct:.0f}% of capacity). Near maximum threshold.",
+            'desc': f"Peak occupancy touched {max_count} heads ({peak_pct:.0f}% of capacity). Near maximum operational threshold.",
         })
     else:
         insights.append({
